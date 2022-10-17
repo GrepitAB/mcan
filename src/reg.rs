@@ -2,24 +2,23 @@
 
 pub mod generic;
 
-pub trait CanId {
+// TODO: Documentation
+/// # Safety
+/// `CanId::Address` points to valid `crate::reg::RegisterBlock`
+pub unsafe trait CanId {
     const ADDRESS: *const RegisterBlock;
 }
 
-pub struct Can<Id> {
-    __: (
-        core::marker::PhantomData<*const ()>,
-        core::marker::PhantomData<Id>,
-    ),
-}
+pub struct Can<Id>(core::marker::PhantomData<(*const (), Id)>);
 
 unsafe impl<Id> Send for Can<Id> {}
 
 impl<Id> Can<Id> {
+    /// # Safety
+    /// Constructing multiple `Can` instances with the same `Id` will lead to
+    /// aliasing of `RegisterBlock`
     pub unsafe fn new() -> Self {
-        Self {
-            __: Default::default(),
-        }
+        Self(core::marker::PhantomData)
     }
 }
 
@@ -322,25 +321,3 @@ pub mod txefs;
 pub type TXEFA = crate::Reg<txefa::TXEFA_SPEC>;
 #[doc = "Tx Event FIFO Acknowledge"]
 pub mod txefa;
-
-// impl core::fmt::Debug for Can {
-//     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-//         f.debug_struct("DummyCan").finish()
-//     }
-// }
-
-#[cfg(test)]
-mod ut {
-    use super::*;
-    #[test]
-    fn ut() {
-        struct Can0Id;
-        impl CanId for Can0Id {
-            const ADDRESS: *const RegisterBlock = 0x0 as *const _;
-        }
-
-        let can0 = unsafe { Can::<Can0Id>::new() };
-        // 😈
-        can0.cust.write(|w: &mut cust::W| unsafe { w.bits(123) });
-    }
-}
