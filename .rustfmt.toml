@@ -1,0 +1,5 @@
+# Run `rustfmt --config-help` to see available config options.
+# Please keep these in alphabetical order.
+use_field_init_shorthand = true
+use_try_shorthand = true
+wrap_comments = true
