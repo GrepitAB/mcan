@@ -490,6 +490,14 @@ impl<Id: crate::CanId> OwnedInterruptSet<Id> {
         self.0 .0 |= other.0 .0;
     }
 
+    /// Clears the flagged interrupts owned by this `OwnedInterruptSet` and
+    /// provides an iterator over the flags that were cleared.
+    pub fn iter_flagged(&self) -> Iter {
+        let interrupts = self.interrupt_flags();
+        self.clear_interrupts(interrupts);
+        interrupts.iter()
+    }
+
     /// # Safety
     /// This gives access to reads and (through interior mutability) writes of
     /// IR. The bits not owned by this set must not be affected by these writes
