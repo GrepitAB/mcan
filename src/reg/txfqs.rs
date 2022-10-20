@@ -95,7 +95,7 @@ impl R {
         TFQF_R::new(((self.bits >> 21) & 0x01) != 0)
     }
 }
-#[doc = "Tx FIFO / Queue Status\n\nThis register you can [`read`](crate::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [txfqs](index.html) module"]
+#[doc = "Tx FIFO / Queue Status\n\nThis register you can [`read`](crate::reg::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [txfqs](index.html) module"]
 pub struct TXFQS_SPEC;
 impl crate::RegisterSpec for TXFQS_SPEC {
     type Ux = u32;

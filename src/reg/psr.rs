@@ -449,7 +449,7 @@ impl R {
         TDCV_R::new(((self.bits >> 16) & 0x7f) as u8)
     }
 }
-#[doc = "Protocol Status\n\nThis register you can [`read`](crate::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [psr](index.html) module"]
+#[doc = "Protocol Status\n\nThis register you can [`read`](crate::reg::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [psr](index.html) module"]
 pub struct PSR_SPEC;
 impl crate::RegisterSpec for PSR_SPEC {
     type Ux = u32;

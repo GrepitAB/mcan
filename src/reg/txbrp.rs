@@ -655,7 +655,7 @@ impl R {
         TRP31_R::new(((self.bits >> 31) & 0x01) != 0)
     }
 }
-#[doc = "Tx Buffer Request Pending\n\nThis register you can [`read`](crate::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [txbrp](index.html) module"]
+#[doc = "Tx Buffer Request Pending\n\nThis register you can [`read`](crate::reg::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [txbrp](index.html) module"]
 pub struct TXBRP_SPEC;
 impl crate::RegisterSpec for TXBRP_SPEC {
     type Ux = u32;

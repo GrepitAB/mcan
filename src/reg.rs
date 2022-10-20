@@ -63,7 +63,7 @@ pub struct RegisterBlock {
     pub ecr: crate::Reg<ecr::ECR_SPEC>,
     #[doc = "0x44 - Protocol Status"]
     pub psr: crate::Reg<psr::PSR_SPEC>,
-    #[doc = "0x48 - Extended ID Filter Configuration"]
+    #[doc = "0x48 - Transmitter Delay Compensation"]
     pub tdcr: crate::Reg<tdcr::TDCR_SPEC>,
     _reserved15: [u8; 0x04],
     #[doc = "0x50 - Interrupt"]
@@ -144,7 +144,7 @@ pub type ENDN = crate::Reg<endn::ENDN_SPEC>;
 pub mod endn;
 #[doc = "CUST register accessor: an alias for `Reg<CUST_SPEC>`"]
 pub type CUST = crate::Reg<cust::CUST_SPEC>;
-#[doc = "Message RAM Configuration"]
+#[doc = "Customer Register"]
 pub mod cust;
 #[doc = "DBTP register accessor: an alias for `Reg<DBTP_SPEC>`"]
 pub type DBTP = crate::Reg<dbtp::DBTP_SPEC>;

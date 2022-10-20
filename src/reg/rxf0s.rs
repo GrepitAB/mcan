@@ -115,7 +115,7 @@ impl R {
         RF0L_R::new(((self.bits >> 25) & 0x01) != 0)
     }
 }
-#[doc = "Rx FIFO 0 Status\n\nThis register you can [`read`](crate::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [rxf0s](index.html) module"]
+#[doc = "Rx FIFO 0 Status\n\nThis register you can [`read`](crate::reg::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [rxf0s](index.html) module"]
 pub struct RXF0S_SPEC;
 impl crate::RegisterSpec for RXF0S_SPEC {
     type Ux = u32;

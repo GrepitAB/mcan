@@ -115,7 +115,7 @@ impl R {
         TEFL_R::new(((self.bits >> 25) & 0x01) != 0)
     }
 }
-#[doc = "Tx Event FIFO Status\n\nThis register you can [`read`](crate::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [txefs](index.html) module"]
+#[doc = "Tx Event FIFO Status\n\nThis register you can [`read`](crate::reg::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [txefs](index.html) module"]
 pub struct TXEFS_SPEC;
 impl crate::RegisterSpec for TXEFS_SPEC {
     type Ux = u32;

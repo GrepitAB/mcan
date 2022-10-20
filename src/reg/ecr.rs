@@ -95,7 +95,7 @@ impl R {
         CEL_R::new(((self.bits >> 16) & 0xff) as u8)
     }
 }
-#[doc = "Error Counter\n\nThis register you can [`read`](crate::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [ecr](index.html) module"]
+#[doc = "Error Counter\n\nThis register you can [`read`](crate::reg::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [ecr](index.html) module"]
 pub struct ECR_SPEC;
 impl crate::RegisterSpec for ECR_SPEC {
     type Ux = u32;

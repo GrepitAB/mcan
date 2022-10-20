@@ -35,7 +35,7 @@ impl R {
         ETV_R::new(self.bits as u32)
     }
 }
-#[doc = "Endian\n\nThis register you can [`read`](crate::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [endn](index.html) module"]
+#[doc = "Endian\n\nThis register you can [`read`](crate::reg::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [endn](index.html) module"]
 pub struct ENDN_SPEC;
 impl crate::RegisterSpec for ENDN_SPEC {
     type Ux = u32;

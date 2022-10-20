@@ -35,7 +35,7 @@ impl R {
         TSC_R::new((self.bits & 0xffff) as u16)
     }
 }
-#[doc = "Timestamp Counter Value\n\nThis register you can [`read`](crate::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [tscv](index.html) module"]
+#[doc = "Timestamp Counter Value\n\nThis register you can [`read`](crate::reg::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [tscv](index.html) module"]
 pub struct TSCV_SPEC;
 impl crate::RegisterSpec for TSCV_SPEC {
     type Ux = u32;
