@@ -294,19 +294,19 @@ pub trait CanBus {
 }
 
 /// A CAN bus
-pub struct Can<'a, Id, P, C: Capacities> {
+pub struct Can<'a, Id, D, C: Capacities> {
     /// CAN bus peripheral
     pub can: crate::reg::Can<Id>,
     config: RamConfig,
     /// For memory safety, all constructors must ensure that the memory is
     /// initialized.
-    dependencies: P,
+    dependencies: D,
     memory: &'a mut SharedMemory<C>,
     /// Controls enabling and line selection of interrupts.
     pub interrupts: InterruptConfiguration<Id>,
 }
 
-impl<'a, Id, P, C: Capacities> Can<'a, Id, P, C> {
+impl<'a, Id, D, C: Capacities> Can<'a, Id, D, C> {
     fn mem_mut(&mut self) -> &mut SharedMemoryInner<C> {
         // Safety: The memory is initialized as a type invariant of self.
         unsafe { self.memory.0.assume_init_mut() }
