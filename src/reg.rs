@@ -89,20 +89,12 @@ pub struct RegisterBlock {
     pub ndat1: crate::Reg<ndat1::NDAT1_SPEC>,
     #[doc = "0x9c - New Data 2"]
     pub ndat2: crate::Reg<ndat2::NDAT2_SPEC>,
-    #[doc = "0xa0 - Rx FIFO 0 Configuration"]
-    pub rxf0c: crate::Reg<rxf0c::RXF0C_SPEC>,
-    #[doc = "0xa4 - Rx FIFO 0 Status"]
-    pub rxf0s: crate::Reg<rxf0s::RXF0S_SPEC>,
-    #[doc = "0xa8 - Rx FIFO 0 Acknowledge"]
-    pub rxf0a: crate::Reg<rxf0a::RXF0A_SPEC>,
+    #[doc = "0xa0 - Rx FIFO 0 registers"]
+    pub rxf0: RxFifoRegs,
     #[doc = "0xac - Rx Buffer Configuration"]
     pub rxbc: crate::Reg<rxbc::RXBC_SPEC>,
-    #[doc = "0xb0 - Rx FIFO 1 Configuration"]
-    pub rxf1c: crate::Reg<rxf1c::RXF1C_SPEC>,
-    #[doc = "0xb4 - Rx FIFO 1 Status"]
-    pub rxf1s: crate::Reg<rxf1s::RXF1S_SPEC>,
-    #[doc = "0xb8 - Rx FIFO 1 Acknowledge"]
-    pub rxf1a: crate::Reg<rxf1a::RXF1A_SPEC>,
+    #[doc = "0xb0 - Rx FIFO 1 registers"]
+    pub rxf1: RxFifoRegs,
     #[doc = "0xbc - Rx Buffer / FIFO Element Size Configuration"]
     pub rxesc: crate::Reg<rxesc::RXESC_SPEC>,
     #[doc = "0xc0 - Tx Buffer Configuration"]
@@ -133,6 +125,17 @@ pub struct RegisterBlock {
     #[doc = "0xf8 - Tx Event FIFO Acknowledge"]
     pub txefa: crate::Reg<txefa::TXEFA_SPEC>,
 }
+
+#[repr(C)]
+pub struct RxFifoRegs {
+    #[doc = "Rx FIFO Configuration"]
+    pub c: crate::Reg<rxfc::RXFC_SPEC>,
+    #[doc = "Rx FIFO Status"]
+    pub s: crate::Reg<rxfs::RXFS_SPEC>,
+    #[doc = "Rx FIFO Acknowledge"]
+    pub a: crate::Reg<rxfa::RXFA_SPEC>,
+}
+
 #[doc = "CREL register accessor: an alias for `Reg<CREL_SPEC>`"]
 pub type CREL = crate::Reg<crel::CREL_SPEC>;
 #[doc = "Core Release"]
@@ -237,34 +240,22 @@ pub mod ndat1;
 pub type NDAT2 = crate::Reg<ndat2::NDAT2_SPEC>;
 #[doc = "New Data 2"]
 pub mod ndat2;
-#[doc = "RXF0C register accessor: an alias for `Reg<RXF0C_SPEC>`"]
-pub type RXF0C = crate::Reg<rxf0c::RXF0C_SPEC>;
-#[doc = "Rx FIFO 0 Configuration"]
-pub mod rxf0c;
-#[doc = "RXF0S register accessor: an alias for `Reg<RXF0S_SPEC>`"]
-pub type RXF0S = crate::Reg<rxf0s::RXF0S_SPEC>;
-#[doc = "Rx FIFO 0 Status"]
-pub mod rxf0s;
-#[doc = "RXF0A register accessor: an alias for `Reg<RXF0A_SPEC>`"]
-pub type RXF0A = crate::Reg<rxf0a::RXF0A_SPEC>;
-#[doc = "Rx FIFO 0 Acknowledge"]
-pub mod rxf0a;
+#[doc = "RXFC register accessor: an alias for `Reg<RXFC_SPEC>`"]
+pub type RXFC = crate::Reg<rxfc::RXFC_SPEC>;
+#[doc = "Rx FIFO Configuration"]
+pub mod rxfc;
+#[doc = "RXFS register accessor: an alias for `Reg<RXFS_SPEC>`"]
+pub type RXFS = crate::Reg<rxfs::RXFS_SPEC>;
+#[doc = "Rx FIFO Status"]
+pub mod rxfs;
+#[doc = "RXFA register accessor: an alias for `Reg<RXFA_SPEC>`"]
+pub type RXFA = crate::Reg<rxfa::RXFA_SPEC>;
+#[doc = "Rx FIFO Acknowledge"]
+pub mod rxfa;
 #[doc = "RXBC register accessor: an alias for `Reg<RXBC_SPEC>`"]
 pub type RXBC = crate::Reg<rxbc::RXBC_SPEC>;
 #[doc = "Rx Buffer Configuration"]
 pub mod rxbc;
-#[doc = "RXF1C register accessor: an alias for `Reg<RXF1C_SPEC>`"]
-pub type RXF1C = crate::Reg<rxf1c::RXF1C_SPEC>;
-#[doc = "Rx FIFO 1 Configuration"]
-pub mod rxf1c;
-#[doc = "RXF1S register accessor: an alias for `Reg<RXF1S_SPEC>`"]
-pub type RXF1S = crate::Reg<rxf1s::RXF1S_SPEC>;
-#[doc = "Rx FIFO 1 Status"]
-pub mod rxf1s;
-#[doc = "RXF1A register accessor: an alias for `Reg<RXF1A_SPEC>`"]
-pub type RXF1A = crate::Reg<rxf1a::RXF1A_SPEC>;
-#[doc = "Rx FIFO 1 Acknowledge"]
-pub mod rxf1a;
 #[doc = "RXESC register accessor: an alias for `Reg<RXESC_SPEC>`"]
 pub type RXESC = crate::Reg<rxesc::RXESC_SPEC>;
 #[doc = "Rx Buffer / FIFO Element Size Configuration"]

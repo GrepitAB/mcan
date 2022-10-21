@@ -478,26 +478,26 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                 });
 
                 //// RX FIFO 0
-                self.can.rxf0c.write(|w| {
-                    w.f0om()
+                self.can.rxf0.c.write(|w| {
+                    w.fom()
                         .bit(config.rxf0.mode.clone().into())
-                        .f0wm()
+                        .fwm()
                         .bits(config.rxf0.watermark)
-                        .f0s()
+                        .fs()
                         .bits(mem.rx_fifo_0.len() as u8)
-                        .f0sa()
+                        .fsa()
                         .bits(&mem.rx_fifo_0 as *const _ as u16)
                 });
 
                 //// RX FIFO 1
-                self.can.rxf1c.write(|w| {
-                    w.f1om()
+                self.can.rxf1.c.write(|w| {
+                    w.fom()
                         .bit(config.rxf1.mode.clone().into())
-                        .f1wm()
+                        .fwm()
                         .bits(config.rxf1.watermark)
-                        .f1s()
+                        .fs()
                         .bits(mem.rx_fifo_1.len() as u8)
-                        .f1sa()
+                        .fsa()
                         .bits(&mem.rx_fifo_1 as *const _ as u16)
                 });
 
@@ -784,7 +784,7 @@ where
 }
 
 macro_rules! impl_fifo {
-    ($fifo:ident, $message_type:ident, $mem_rx_fifo:ident, $rxfcfg:ident, $rxfstat:ident, $rxfack:ident, $gi:tt, $ai:tt, $pi:tt, $fl:tt, $fs:tt) => {
+    ($fifo:ident, $message_type:ident, $mem_rx_fifo:ident, $rxf:ident) => {
         impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
             CanReadFifo<$fifo, C, C::$message_type> for Can<'_, Id, D, C>
         {
@@ -805,31 +805,31 @@ macro_rules! impl_fifo {
 
             fn mark_fifo_read(&mut self) -> Result<()> {
                 // Increment get index
-                let get_index = self.can.$rxfstat.read().$gi().bits();
+                let get_index = self.can.$rxf.s.read().fgi().bits();
                 unsafe {
-                    self.can.$rxfack.write(|w| w.$ai().bits(get_index));
+                    self.can.$rxf.a.write(|w| w.fai().bits(get_index));
                 }
 
                 Ok(())
             }
 
             fn get(&self) -> usize {
-                (self.can.$rxfstat.read().$gi().bits()) as usize
+                (self.can.$rxf.s.read().fgi().bits()) as usize
             }
 
             fn put(&self) -> usize {
-                (self.can.$rxfstat.read().$pi().bits()) as usize
+                (self.can.$rxf.s.read().fpi().bits()) as usize
             }
 
             fn fill(&self) -> usize {
-                (self.can.$rxfstat.read().$fl().bits()) as usize
+                (self.can.$rxf.s.read().ffl().bits()) as usize
             }
 
             fn free(&self) -> usize {
                 // The maximum size according to the datasheet.
                 const MAX_SIZE: u8 = 64;
 
-                let reg_value = self.can.$rxfcfg.read().$fs().bits();
+                let reg_value = self.can.$rxf.c.read().fs().bits();
                 let max_elems = usize::from(min(reg_value, MAX_SIZE));
 
                 let fill = CanReadFifo::<$fifo, C, C::$message_type>::fill(self);
@@ -840,32 +840,8 @@ macro_rules! impl_fifo {
     };
 }
 
-impl_fifo!(
-    Fifo0,
-    RxFifo0Message,
-    rx_fifo_0,
-    rxf0c,
-    rxf0s,
-    rxf0a,
-    f0gi,
-    f0ai,
-    f0pi,
-    f0fl,
-    f0s
-);
-impl_fifo!(
-    Fifo1,
-    RxFifo1Message,
-    rx_fifo_1,
-    rxf1c,
-    rxf1s,
-    rxf1a,
-    f1gi,
-    f1ai,
-    f1pi,
-    f1fl,
-    f1s
-);
+impl_fifo!(Fifo0, RxFifo0Message, rx_fifo_0, rxf0);
+impl_fifo!(Fifo1, RxFifo1Message, rx_fifo_1, rxf1);
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanReadBuffer<C>
     for Can<'_, Id, D, C>
