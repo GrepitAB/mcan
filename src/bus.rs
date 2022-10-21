@@ -1,7 +1,8 @@
 //! Pad declarations for the CAN buses
 
+use crate::messageram::SharedMemoryInner;
 use crate::reg::{ecr::R as ECR, psr::R as PSR};
-use core::cmp::min;
+use crate::rx_fifo::{Fifo0, Fifo1, RxFifo};
 use core::convert::From;
 use core::fmt::{self, Debug};
 
@@ -11,8 +12,8 @@ use super::{
         RamConfig,
     },
     filter::{ExtFilter, Filter},
-    message::{self, rx, tx, AnyMessage},
-    messageram::{Capacities, SharedMemory, SharedMemoryInner},
+    message::{self, tx, AnyMessage},
+    messageram::{Capacities, SharedMemory, UnsplitMemory},
 };
 use embedded_hal::can::Id;
 use fugit::{HertzU32, RateExtU32};
@@ -121,26 +122,6 @@ impl From<message::Error> for Error {
 /// CAN bus results
 pub type Result<T> = core::result::Result<T, Error>;
 
-/// RX fifo
-pub trait CanFifo {
-    /// Interrupt index offset
-    const INT_OFFSET: usize;
-}
-
-/// FIFO 0 representation
-pub struct Fifo0;
-
-impl CanFifo for Fifo0 {
-    const INT_OFFSET: usize = 0;
-}
-
-/// FIFO 0 representation
-pub struct Fifo1;
-
-impl CanFifo for Fifo1 {
-    const INT_OFFSET: usize = 4;
-}
-
 /// Token for identifying bus during runtime
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BusSlot {
@@ -168,62 +149,6 @@ pub trait CanSendBuffer<C: Capacities> {
 pub trait CanSendSlice<C: Capacities> {
     /// Send a slice through tx fifo
     fn send_slice(&mut self, id: Id, data: &[u8]) -> Result<()>;
-}
-
-/// Read transmitted messages from FIFO
-pub trait CanReadFifo<F: CanFifo, C: Capacities, M: rx::AnyMessage>
-where
-    Self: CanBus,
-{
-    /// Pop the topmost message off the FIFO and return it
-    fn read(&mut self) -> Result<M> {
-        // Get the top message
-        let message = self.peek()?;
-
-        // Pop the message
-        Self::mark_fifo_read(self)?;
-
-        // Clear RX interrupt if this is the last message
-        if Self::fill(self) == 0 {
-            <Self as CanBus>::clear_interrupts(self, 1 << F::INT_OFFSET);
-        }
-
-        // Return peeked message
-        Ok(message)
-    }
-
-    /// Pop the topmost message off the FIFO and write its data to a slice
-    fn read_slice(&mut self, output: &mut [u8]) -> Result<()> {
-        let message: M = self.read()?;
-        let data = message.data();
-
-        if data.len() > output.len() {
-            // The output slice is too small
-            Err(Error::ElementOverflow)
-        } else {
-            output[..data.len()].copy_from_slice(data);
-            Ok(())
-        }
-    }
-
-    /// Get first message without popping it
-    // TODO: implement as default in trait
-    fn peek(&mut self) -> Result<M>;
-
-    /// Mark an item as read
-    fn mark_fifo_read(&mut self) -> Result<()>;
-
-    /// Get the current get index
-    fn get(&self) -> usize;
-
-    /// Get current put index
-    fn put(&self) -> usize;
-
-    /// Get number of elements in buffer
-    fn fill(&self) -> usize;
-
-    /// Get number of free slots in buffer
-    fn free(&self) -> usize;
 }
 
 /// Write transmission messages to FIFO
@@ -297,13 +222,14 @@ pub trait CanBus {
 pub struct Can<'a, Id, D, C: Capacities> {
     /// CAN bus peripheral
     pub can: crate::reg::Can<Id>,
-    config: RamConfig,
     /// For memory safety, all constructors must ensure that the memory is
     /// initialized.
     dependencies: D,
-    memory: &'a mut SharedMemoryInner<C>,
+    memory: UnsplitMemory<'a, C>,
     /// Controls enabling and line selection of interrupts.
     pub interrupts: InterruptConfiguration<Id>,
+    pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0, C::RxFifo0Message>,
+    pub rx_fifo_1: RxFifo<'a, Fifo1, Id, C::RxFifo1, C::RxFifo1Message>,
 }
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
@@ -423,16 +349,17 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
     /// application. Furthermore, the Config         may only be applied
     /// safely if the bus is initializing, if the bus is not
     ///         initializing, an error is returned.
-    fn apply_ram_config(&mut self) -> Result<()> {
-        if !self.can.cccr.read().init().bit() {
+    fn apply_ram_config(
+        can: &crate::reg::Can<Id>,
+        mem: &SharedMemoryInner<C>,
+        config: &RamConfig,
+    ) -> Result<()> {
+        if !can.cccr.read().init().bit() {
             return Err(Error::NotInitializing);
         } else {
-            let config = &self.config;
-            let mem = &self.memory;
-
             unsafe {
                 // Standard id
-                self.can.sidfc.write(|w| {
+                can.sidfc.write(|w| {
                     w.flssa()
                         .bits(&mem.filters_standard as *const _ as u16)
                         .lss()
@@ -440,7 +367,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                 });
 
                 // Extended id
-                self.can.xidfc.write(|w| {
+                can.xidfc.write(|w| {
                     w.flesa()
                         .bits(&mem.filters_extended as *const _ as u16)
                         .lse()
@@ -448,12 +375,11 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                 });
 
                 // RX buffers
-                self.can
-                    .rxbc
+                can.rxbc
                     .write(|w| w.rbsa().bits(&mem.rx_dedicated_buffers as *const _ as u16));
 
                 // Data field size for buffers and FIFOs
-                self.can.rxesc.write(|w| {
+                can.rxesc.write(|w| {
                     w.rbds()
                         .bits(C::RxBufferMessage::REG)
                         .f0ds()
@@ -463,7 +389,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                 });
 
                 //// RX FIFO 0
-                self.can.rxf0.c.write(|w| {
+                can.rxf0.c.write(|w| {
                     w.fom()
                         .bit(config.rxf0.mode.clone().into())
                         .fwm()
@@ -475,7 +401,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                 });
 
                 //// RX FIFO 1
-                self.can.rxf1.c.write(|w| {
+                can.rxf1.c.write(|w| {
                     w.fom()
                         .bit(config.rxf1.mode.clone().into())
                         .fwm()
@@ -487,7 +413,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                 });
 
                 // TX buffers
-                self.can.txbc.write(|w| {
+                can.txbc.write(|w| {
                     w.tfqm()
                         .bit(config.txbc.mode.clone().into())
                         .tfqs()
@@ -502,10 +428,10 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                 });
 
                 // TX element size config
-                self.can.txesc.write(|w| w.tbds().bits(C::TxMessage::REG));
+                can.txesc.write(|w| w.tbds().bits(C::TxMessage::REG));
 
                 // TX events
-                self.can.txefc.write(|w| {
+                can.txefc.write(|w| {
                     w.efwm()
                         .bits(config.txefc.watermark)
                         .efs()
@@ -768,66 +694,6 @@ where
     }
 }
 
-macro_rules! impl_fifo {
-    ($fifo:ident, $message_type:ident, $mem_rx_fifo:ident, $rxf:ident) => {
-        impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
-            CanReadFifo<$fifo, C, C::$message_type> for Can<'_, Id, D, C>
-        {
-            fn peek(&mut self) -> Result<C::$message_type> {
-                if CanReadFifo::<$fifo, C, C::$message_type>::fill(self) <= 0 {
-                    Err(Error::FifoEmpty)
-                } else {
-                    let index = CanReadFifo::<$fifo, C, C::$message_type>::get(self);
-                    let m = self
-                        .memory
-                        .$mem_rx_fifo
-                        .get(index)
-                        .ok_or(Error::OutOfBounds)?
-                        .get();
-                    Ok(m)
-                }
-            }
-
-            fn mark_fifo_read(&mut self) -> Result<()> {
-                // Increment get index
-                let get_index = self.can.$rxf.s.read().fgi().bits();
-                unsafe {
-                    self.can.$rxf.a.write(|w| w.fai().bits(get_index));
-                }
-
-                Ok(())
-            }
-
-            fn get(&self) -> usize {
-                (self.can.$rxf.s.read().fgi().bits()) as usize
-            }
-
-            fn put(&self) -> usize {
-                (self.can.$rxf.s.read().fpi().bits()) as usize
-            }
-
-            fn fill(&self) -> usize {
-                (self.can.$rxf.s.read().ffl().bits()) as usize
-            }
-
-            fn free(&self) -> usize {
-                // The maximum size according to the datasheet.
-                const MAX_SIZE: u8 = 64;
-
-                let reg_value = self.can.$rxf.c.read().fs().bits();
-                let max_elems = usize::from(min(reg_value, MAX_SIZE));
-
-                let fill = CanReadFifo::<$fifo, C, C::$message_type>::fill(self);
-
-                max_elems.saturating_sub(fill)
-            }
-        }
-    };
-}
-
-impl_fifo!(Fifo0, RxFifo0Message, rx_fifo_0, rxf0);
-impl_fifo!(Fifo1, RxFifo1Message, rx_fifo_1, rxf1);
-
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanReadBuffer<C>
     for Can<'_, Id, D, C>
 {
@@ -896,16 +762,26 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
         let can = unsafe { crate::reg::Can::<Id>::new() };
 
         let memory = memory.init();
+        Self::apply_ram_config(&can, memory, &ram_cfg).unwrap();
+
+        let unsplit_memory = UnsplitMemory {
+            filters_standard: &mut memory.filters_standard,
+            filters_extended: &mut memory.filters_extended,
+            rx_dedicated_buffers: &mut memory.rx_dedicated_buffers,
+            _tx_event_fifo: &mut memory.tx_event_fifo,
+            tx_buffers: &mut memory.tx_buffers,
+        };
         let mut bus = Self {
             can,
-            config: ram_cfg,
             dependencies,
-            memory,
+            memory: unsplit_memory,
             // Safety: Since `new` takes a PAC singleton, it can only be called once. Then no
             // duplicate `InterruptConfiguration` will be constructed. The registers
             // that are delegated to `InterruptConfiguration` should not be touched by any other
             // code. This has to be upheld by all code that has access to the register block.
             interrupts: unsafe { InterruptConfiguration::new() },
+            rx_fifo_0: unsafe { RxFifo::new(&mut memory.rx_fifo_0) },
+            rx_fifo_1: unsafe { RxFifo::new(&mut memory.rx_fifo_1) },
         };
 
         bus.enter_config_mode();
@@ -915,9 +791,6 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
         while !bus.can.cccr.read().cce().bit() {
             // TODO: Make sure this loop does not get optimized away
         }
-
-        // Apply RAM configuration
-        bus.apply_ram_config().unwrap();
 
         // Apply additional CAN config
         bus.apply_bus_config(&can_cfg, freq).unwrap();

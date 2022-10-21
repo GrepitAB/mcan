@@ -6,6 +6,7 @@ pub mod filter;
 pub mod message;
 pub mod messageram;
 pub mod reg;
+pub mod rx_fifo;
 
 pub use reg::CanId;
 

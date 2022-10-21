@@ -73,6 +73,19 @@ pub(super) struct SharedMemoryInner<C: Capacities> {
     pub(super) tx_buffers: GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
 }
 
+/// Holds the parts of SharedMemory that are not yet borrowed by sub-structs
+/// like `RxFifo`.
+pub(super) struct UnsplitMemory<'a, C: Capacities> {
+    pub(super) filters_standard:
+        &'a mut GenericArray<VolatileCell<FilterStandardId>, C::StandardFilters>,
+    pub(super) filters_extended:
+        &'a mut GenericArray<VolatileCell<FilterExtendedId>, C::ExtendedFilters>,
+    pub(super) rx_dedicated_buffers:
+        &'a mut GenericArray<VolatileCell<C::RxBufferMessage>, C::DedicatedRxBuffers>,
+    pub(super) _tx_event_fifo: &'a mut GenericArray<VolatileCell<TxEvent>, C::TxEventFifo>,
+    pub(super) tx_buffers: &'a mut GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
+}
+
 /// Memory shared between the peripheral and core. Provide a struct `C` that
 /// implements [`Capacities`] to select the sizes of the buffers, then construct
 /// this using `SharedMemory::<C>::new()`.
