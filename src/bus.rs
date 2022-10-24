@@ -301,21 +301,9 @@ pub struct Can<'a, Id, D, C: Capacities> {
     /// For memory safety, all constructors must ensure that the memory is
     /// initialized.
     dependencies: D,
-    memory: &'a mut SharedMemory<C>,
+    memory: &'a mut SharedMemoryInner<C>,
     /// Controls enabling and line selection of interrupts.
     pub interrupts: InterruptConfiguration<Id>,
-}
-
-impl<'a, Id, D, C: Capacities> Can<'a, Id, D, C> {
-    fn mem_mut(&mut self) -> &mut SharedMemoryInner<C> {
-        // Safety: The memory is initialized as a type invariant of self.
-        unsafe { self.memory.0.assume_init_mut() }
-    }
-
-    fn mem(&self) -> &SharedMemoryInner<C> {
-        // Safety: The memory is initialized as a type invariant of self.
-        unsafe { self.memory.0.assume_init_ref() }
-    }
 }
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
@@ -439,11 +427,8 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
         if !self.can.cccr.read().init().bit() {
             return Err(Error::NotInitializing);
         } else {
-            // Clear RAM before use
-            self.memory.clear();
-
             let config = &self.config;
-            let mem = self.mem();
+            let mem = &self.memory;
 
             unsafe {
                 // Standard id
@@ -671,7 +656,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
     }
 
     fn set_filter(&mut self, index: usize, filter: Filter) -> Result<()> {
-        self.mem_mut()
+        self.memory
             .filters_standard
             .get_mut(index)
             .ok_or(Error::OutOfBounds)?
@@ -680,7 +665,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
     }
 
     fn set_ext_filter(&mut self, index: usize, filter: ExtFilter) -> Result<()> {
-        self.mem_mut()
+        self.memory
             .filters_extended
             .get_mut(index)
             .ok_or(Error::OutOfBounds)?
@@ -721,7 +706,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanSendBuffer<
         if index > <C::DedicatedTxBuffers as Unsigned>::USIZE {
             return Err(Error::OutOfBounds);
         } else {
-            self.mem_mut()
+            self.memory
                 .tx_buffers
                 .get_mut(index)
                 .ok_or(Error::OutOfBounds)?
@@ -755,7 +740,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanSendFifo<C>
         // Get current put index
         let index = self.put()?;
 
-        self.mem_mut()
+        self.memory
             .tx_buffers
             .get_mut(index)
             .ok_or(Error::OutOfBounds)?
@@ -794,7 +779,7 @@ macro_rules! impl_fifo {
                 } else {
                     let index = CanReadFifo::<$fifo, C, C::$message_type>::get(self);
                     let m = self
-                        .mem_mut()
+                        .memory
                         .$mem_rx_fifo
                         .get(index)
                         .ok_or(Error::OutOfBounds)?
@@ -851,7 +836,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanReadBuffer<
             return Err(Error::BufferDataNotNew);
         } else {
             let m = self
-                .mem()
+                .memory
                 .rx_dedicated_buffers
                 .get(index)
                 .ok_or(Error::OutOfBounds)?
@@ -910,6 +895,7 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
         // `Id: CanId`, `can` has a unique access to it
         let can = unsafe { crate::reg::Can::<Id>::new() };
 
+        let memory = memory.init();
         let mut bus = Self {
             can,
             config: ram_cfg,

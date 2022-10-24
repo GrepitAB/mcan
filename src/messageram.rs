@@ -76,11 +76,13 @@ pub(super) struct SharedMemoryInner<C: Capacities> {
 /// Memory shared between the peripheral and core. Provide a struct `C` that
 /// implements [`Capacities`] to select the sizes of the buffers, then construct
 /// this using `SharedMemory::<C>::new()`.
-pub struct SharedMemory<C: Capacities>(pub(super) MaybeUninit<SharedMemoryInner<C>>);
+pub struct SharedMemory<C: Capacities>(MaybeUninit<SharedMemoryInner<C>>);
 
 impl<C: Capacities> SharedMemory<C> {
-    pub(super) fn clear(&mut self) {
+    pub(super) fn init(&mut self) -> &mut SharedMemoryInner<C> {
         self.0 = MaybeUninit::zeroed();
+        // Safety: All bits 0 is a valid value for all the contained arrays.
+        unsafe { self.0.assume_init_mut() }
     }
 
     /// All initialization is handled by the type that uses the memory, so this
