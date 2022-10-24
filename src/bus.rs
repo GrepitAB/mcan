@@ -2,6 +2,7 @@
 
 use crate::messageram::SharedMemoryInner;
 use crate::reg::{ecr::R as ECR, psr::R as PSR};
+use crate::rx_dedicated_buffers::RxDedicatedBuffer;
 use crate::rx_fifo::{Fifo0, Fifo1, RxFifo};
 use core::convert::From;
 use core::fmt::{self, Debug};
@@ -113,6 +114,15 @@ pub enum Error {
     MemoryNotAddressable,
 }
 
+/// Index is out of bounds
+pub struct OutOfBounds;
+
+impl From<OutOfBounds> for Error {
+    fn from(_: OutOfBounds) -> Self {
+        Self::OutOfBounds
+    }
+}
+
 impl From<message::Error> for Error {
     fn from(err: message::Error) -> Self {
         Self::MessageError(err)
@@ -168,21 +178,6 @@ pub trait CanSendFifo<C: Capacities> {
     fn send_fifo(&mut self, message: C::TxMessage) -> Result<()>;
 }
 
-/// Read transmitted messages from buffer
-pub trait CanReadBuffer<C: Capacities> {
-    /// Read a message in the message buffer
-    ///
-    /// ```text
-    /// [ ID3_, ____, ____, ID8_, ID24 | ____, ID4_, ID2_, ____ ]
-    ///         V index
-    ///         ID15,
-    /// ```
-    fn read_buffer(&mut self, index: usize) -> Result<C::RxBufferMessage>;
-
-    /// Mark an item as read
-    fn mark_buffer_read(&mut self, index: usize) -> Result<()>;
-}
-
 /// Common CANbus functionality
 /// TODO: build interrupt struct around this
 pub trait CanBus {
@@ -190,8 +185,6 @@ pub trait CanBus {
     fn error_counters(&self) -> ErrorCounters;
     /// Read additional status information
     fn protocol_status(&self) -> ProtocolStatus;
-    /// Read new data status for message at index
-    fn new_data(&self, index: usize) -> Result<bool>;
     /// Mask interrupts on
     fn enable_interrupts(&mut self, mask: u32);
     /// Mask interrupts off
@@ -230,6 +223,7 @@ pub struct Can<'a, Id, D, C: Capacities> {
     pub interrupts: InterruptConfiguration<Id>,
     pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0, C::RxFifo0Message>,
     pub rx_fifo_1: RxFifo<'a, Fifo1, Id, C::RxFifo1, C::RxFifo1Message>,
+    pub rx_dedicated_buffers: RxDedicatedBuffer<'a, Id, C::DedicatedRxBuffers, C::RxBufferMessage>,
 }
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
@@ -504,16 +498,6 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
         self.can.psr.read().into()
     }
 
-    fn new_data(&self, index: usize) -> Result<bool> {
-        if index < 32 {
-            Ok(self.can.ndat1.read().bits() & (1 << index) > 0)
-        } else if index < 64 {
-            Ok(self.can.ndat1.read().bits() & (1 << (index - 32)) > 0)
-        } else {
-            Err(Error::InvalidBufferIndex)
-        }
-    }
-
     fn enable_interrupts(&mut self, mask: u32) {
         unsafe {
             self.can.ie.modify(|r, w| w.bits(r.bits() | mask));
@@ -694,51 +678,6 @@ where
     }
 }
 
-impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanReadBuffer<C>
-    for Can<'_, Id, D, C>
-{
-    fn read_buffer(&mut self, index: usize) -> Result<C::RxBufferMessage> {
-        if !self.new_data(index)? {
-            return Err(Error::BufferDataNotNew);
-        } else {
-            let m = self
-                .memory
-                .rx_dedicated_buffers
-                .get(index)
-                .ok_or(Error::OutOfBounds)?
-                .get();
-            <Self as CanReadBuffer<C>>::mark_buffer_read(self, index)?;
-            Ok(m)
-        }
-    }
-
-    fn mark_buffer_read(&mut self, index: usize) -> Result<()> {
-        match index {
-            0..=31 => {
-                if self.can.ndat1.read().bits() & (1 << index) != 0 {
-                    unsafe {
-                        self.can.ndat1.write(|w| w.bits(1 << index));
-                    }
-                } else {
-                    return Err(Error::BufferDataNotNew);
-                }
-            }
-            32..=63 => {
-                if self.can.ndat2.read().bits() & (1 << (index >> 1)) != 0 {
-                    unsafe {
-                        self.can.ndat2.write(|w| w.bits(1 << (index >> 1)));
-                    }
-                } else {
-                    return Err(Error::BufferDataNotNew);
-                }
-            }
-            _ => return Err(Error::InvalidBufferIndex),
-        }
-
-        Ok(())
-    }
-}
-
 impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id, D, C> {
     /// Create new can peripheral.
     ///
@@ -767,7 +706,6 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
         let unsplit_memory = UnsplitMemory {
             filters_standard: &mut memory.filters_standard,
             filters_extended: &mut memory.filters_extended,
-            rx_dedicated_buffers: &mut memory.rx_dedicated_buffers,
             _tx_event_fifo: &mut memory.tx_event_fifo,
             tx_buffers: &mut memory.tx_buffers,
         };
@@ -775,13 +713,16 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
             can,
             dependencies,
             memory: unsplit_memory,
-            // Safety: Since `new` takes a PAC singleton, it can only be called once. Then no
-            // duplicate `InterruptConfiguration` will be constructed. The registers
-            // that are delegated to `InterruptConfiguration` should not be touched by any other
-            // code. This has to be upheld by all code that has access to the register block.
+            // Safety: Since `Can::new` takes a PAC singleton, it can only be called once. Then no
+            // duplicates will be constructed. The registers that are delegated to these components
+            // should not be touched by any other code. This has to be upheld by all code that has
+            // access to the register block.
             interrupts: unsafe { InterruptConfiguration::new() },
             rx_fifo_0: unsafe { RxFifo::new(&mut memory.rx_fifo_0) },
             rx_fifo_1: unsafe { RxFifo::new(&mut memory.rx_fifo_1) },
+            rx_dedicated_buffers: unsafe {
+                RxDedicatedBuffer::new(&mut memory.rx_dedicated_buffers)
+            },
         };
 
         bus.enter_config_mode();

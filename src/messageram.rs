@@ -80,8 +80,6 @@ pub(super) struct UnsplitMemory<'a, C: Capacities> {
         &'a mut GenericArray<VolatileCell<FilterStandardId>, C::StandardFilters>,
     pub(super) filters_extended:
         &'a mut GenericArray<VolatileCell<FilterExtendedId>, C::ExtendedFilters>,
-    pub(super) rx_dedicated_buffers:
-        &'a mut GenericArray<VolatileCell<C::RxBufferMessage>, C::DedicatedRxBuffers>,
     pub(super) _tx_event_fifo: &'a mut GenericArray<VolatileCell<TxEvent>, C::TxEventFifo>,
     pub(super) tx_buffers: &'a mut GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
 }
