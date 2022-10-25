@@ -185,16 +185,6 @@ pub trait CanBus {
     fn error_counters(&self) -> ErrorCounters;
     /// Read additional status information
     fn protocol_status(&self) -> ProtocolStatus;
-    /// Mask interrupts on
-    fn enable_interrupts(&mut self, mask: u32);
-    /// Mask interrupts off
-    fn disable_interrupts(&mut self, mask: u32);
-    /// Apply new interrupt mask
-    fn interrupt_mask(&mut self, mask: u32);
-    /// Retrieve currently runnign interrupts
-    fn get_interrupts(&mut self) -> u32;
-    /// Clear interrupt flags
-    fn clear_interrupts(&mut self, mask: u32);
     /// Enable/disable loopback mode
     fn loopback(&mut self, state: bool);
     /// Enable/disable CAN-FD mode
@@ -496,34 +486,6 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
 
     fn protocol_status(&self) -> ProtocolStatus {
         self.can.psr.read().into()
-    }
-
-    fn enable_interrupts(&mut self, mask: u32) {
-        unsafe {
-            self.can.ie.modify(|r, w| w.bits(r.bits() | mask));
-        }
-    }
-
-    fn disable_interrupts(&mut self, mask: u32) {
-        unsafe {
-            self.can.ie.modify(|r, w| w.bits(r.bits() & !mask));
-        }
-    }
-
-    fn interrupt_mask(&mut self, mask: u32) {
-        unsafe {
-            self.can.ie.write(|w| w.bits(mask));
-        }
-    }
-
-    fn get_interrupts(&mut self) -> u32 {
-        self.can.ir.read().bits()
-    }
-
-    fn clear_interrupts(&mut self, mask: u32) {
-        unsafe {
-            self.can.ir.write(|w| w.bits(mask));
-        }
     }
 
     /// Set CAN FD mode
