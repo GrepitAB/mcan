@@ -1,6 +1,6 @@
 //! Message filters
 use super::messageram;
-use embedded_hal::can::{ExtendedId, StandardId};
+use embedded_can::{ExtendedId, StandardId};
 
 /// Message filter field for 11-bit RX messages
 pub enum Filter {

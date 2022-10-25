@@ -15,7 +15,7 @@ use super::{
     message::{self, tx, AnyMessage},
     messageram::{Capacities, SharedMemory, UnsplitMemory},
 };
-use embedded_hal::can::Id;
+use embedded_can::Id;
 use fugit::{HertzU32, RateExtU32};
 use generic_array::typenum::Unsigned;
 
@@ -682,7 +682,7 @@ impl<Id: crate::CanId, const N: usize, D: crate::Dependencies<Id>, C> CanSendSli
 where
     C: Capacities<TxMessage = tx::Message<N>>,
 {
-    fn send_slice(&mut self, id: embedded_hal::can::Id, data: &[u8]) -> Result<()> {
+    fn send_slice(&mut self, id: embedded_can::Id, data: &[u8]) -> Result<()> {
         let message = tx::MessageBuilder {
             id,
             frame_contents: tx::FrameContents::Data(data),

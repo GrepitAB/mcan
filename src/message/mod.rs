@@ -4,7 +4,7 @@ pub mod rx;
 pub mod tx;
 
 use core::cmp::min;
-use embedded_hal::can::{ExtendedId, Id, StandardId};
+use embedded_can::{ExtendedId, Frame, Id, StandardId};
 
 /// This trait is only implemented for the data sizes that the peripheral can be
 /// configured to use.
@@ -53,7 +53,7 @@ impl<const N: usize> Message<N> {
     }
 }
 
-impl<const N: usize> embedded_hal::can::Frame for Message<N> {
+impl<const N: usize> Frame for Message<N> {
     fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
         tx::MessageBuilder {
             id: id.into(),
