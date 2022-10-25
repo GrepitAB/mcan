@@ -167,8 +167,14 @@ bitfield! {
     /// Tx Fifo Empty
     pub tfe, set_tfe:  11;
     /// Transmission Cancellation Finished
+    /// Note that there is a sub-interrupt for each transmit buffer element
+    /// that is disabled by default. These sub-interrupts are enabled through
+    /// [`Tx::enable_cancellation_interrupt`].
     pub tcf, set_tcf:  10;
     /// Transmission Completed
+    /// Note that there is a sub-interrupt for each transmit buffer element
+    /// that is disabled by default. These sub-interrupts are enabled through
+    /// [`Tx::enable_transmission_completed_interrupt`].
     pub tc, set_tc:   9;
     /// High Priority Message
     pub hpm, set_hpm:  8;
@@ -422,7 +428,7 @@ impl InterruptSet {
 
 /// An iterator over the items of an [`InterruptSet`].
 ///
-/// This `struct is created by [`InterruptSet::iter`].
+/// This `struct` is created by [`InterruptSet::iter`].
 pub struct Iter {
     flags: InterruptSet,
     index: u8,

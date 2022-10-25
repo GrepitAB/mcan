@@ -8,6 +8,7 @@ pub mod messageram;
 pub mod reg;
 pub mod rx_dedicated_buffers;
 pub mod rx_fifo;
+pub mod tx_buffers;
 
 pub use reg::CanId;
 

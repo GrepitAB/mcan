@@ -81,7 +81,6 @@ pub(super) struct UnsplitMemory<'a, C: Capacities> {
     pub(super) filters_extended:
         &'a mut GenericArray<VolatileCell<FilterExtendedId>, C::ExtendedFilters>,
     pub(super) _tx_event_fifo: &'a mut GenericArray<VolatileCell<TxEvent>, C::TxEventFifo>,
-    pub(super) tx_buffers: &'a mut GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
 }
 
 /// Memory shared between the peripheral and core. Provide a struct `C` that

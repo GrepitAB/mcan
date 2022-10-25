@@ -4,6 +4,7 @@ use crate::messageram::SharedMemoryInner;
 use crate::reg::{ecr::R as ECR, psr::R as PSR};
 use crate::rx_dedicated_buffers::RxDedicatedBuffer;
 use crate::rx_fifo::{Fifo0, Fifo1, RxFifo};
+use crate::tx_buffers::Tx;
 use core::convert::From;
 use core::fmt::{self, Debug};
 
@@ -13,10 +14,9 @@ use super::{
         RamConfig,
     },
     filter::{ExtFilter, Filter},
-    message::{self, tx, AnyMessage},
+    message::{self, AnyMessage},
     messageram::{Capacities, SharedMemory, UnsplitMemory},
 };
-use embedded_can::Id;
 use fugit::{HertzU32, RateExtU32};
 use generic_array::typenum::Unsigned;
 
@@ -141,43 +141,6 @@ pub enum BusSlot {
     Can1,
 }
 
-/// Setup message transmissions
-pub trait CanSendBuffer<C: Capacities> {
-    /// Transmit message with id
-    fn transmit_buffer(&mut self, id: usize) -> Result<()>;
-
-    /// Write TX message to transmission buffer
-    ///
-    /// ```text
-    /// [ ID3_, ID15, XXXX, ____, ID8_, ID24 | ____, ID4_, ID2_, ____ ]
-    ///               ^index
-    /// ```
-    fn send_buffer(&mut self, index: usize, message: C::TxMessage, auto_send: bool) -> Result<()>;
-}
-
-/// Slice output interface
-pub trait CanSendSlice<C: Capacities> {
-    /// Send a slice through tx fifo
-    fn send_slice(&mut self, id: Id, data: &[u8]) -> Result<()>;
-}
-
-/// Write transmission messages to FIFO
-pub trait CanSendFifo<C: Capacities> {
-    /// Mark an item as read
-    fn transmit_fifo(&mut self, index: usize) -> Result<()>;
-
-    /// Get the current put index
-    fn put(&mut self) -> Result<usize>;
-
-    /// Add a message to a tranmission FIFO
-    ///
-    /// ```text
-    /// [ ID3_, ID15, ____, ____, ID8_, ID24 | ____, ID4_, ID2_, XXXX ]
-    ///                                                          ^put
-    /// ```
-    fn send_fifo(&mut self, message: C::TxMessage) -> Result<()>;
-}
-
 /// Common CANbus functionality
 /// TODO: build interrupt struct around this
 pub trait CanBus {
@@ -214,6 +177,7 @@ pub struct Can<'a, Id, D, C: Capacities> {
     pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0, C::RxFifo0Message>,
     pub rx_fifo_1: RxFifo<'a, Fifo1, Id, C::RxFifo1, C::RxFifo1Message>,
     pub rx_dedicated_buffers: RxDedicatedBuffer<'a, Id, C::DedicatedRxBuffers, C::RxBufferMessage>,
+    pub tx: Tx<'a, Id, C>,
 }
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
@@ -446,37 +410,6 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
             }
         }
     }
-
-    /// Signal add by writing a new request mask
-    pub fn add_request(&mut self, mask: u32) -> Result<()> {
-        unsafe {
-            self.can.txbar.write(|w| w.bits(mask));
-        }
-        Ok(())
-
-        // if (mask >> self.can.txbc.read().tfqs().bits()) == 0 {
-        //     // TODO: this need s to be reworked!
-        //     Err(Error::InvalidTxBuffer(mask))
-        // } else {
-        //     unsafe {
-        //         self.can.txbar.write(|w| w.bits(mask));
-        //     }
-        //     Ok(())
-        // }
-    }
-
-    /// Signal cancellation by writing a new request mask
-    #[allow(unused)]
-    fn cancel_request(&mut self, mask: u32) -> Result<()> {
-        if (mask >> self.can.txbc.read().tfqs().bits()) == 0 {
-            Err(Error::InvalidTxBuffer(mask))
-        } else {
-            unsafe {
-                self.can.txbcr.write(|w| w.bits(mask));
-            }
-            Ok(())
-        }
-    }
 }
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can<'_, Id, D, C> {
@@ -567,79 +500,6 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
     }
 }
 
-impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanSendBuffer<C>
-    for Can<'_, Id, D, C>
-{
-    fn transmit_buffer(&mut self, id: usize) -> Result<()> {
-        self.add_request(1 << id)
-    }
-
-    fn send_buffer(&mut self, index: usize, message: C::TxMessage, auto_send: bool) -> Result<()> {
-        if index > <C::DedicatedTxBuffers as Unsigned>::USIZE {
-            return Err(Error::OutOfBounds);
-        } else {
-            self.memory
-                .tx_buffers
-                .get_mut(index)
-                .ok_or(Error::OutOfBounds)?
-                .set(message);
-
-            if auto_send {
-                // Send an add request for the current message
-                Ok(self.transmit_buffer(index)?)
-            } else {
-                Ok(())
-            }
-        }
-    }
-}
-
-impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanSendFifo<C>
-    for Can<'_, Id, D, C>
-{
-    fn transmit_fifo(&mut self, index: usize) -> Result<()> {
-        self.add_request(1 << index)
-    }
-
-    fn put(&mut self) -> Result<usize> {
-        if self.can.txfqs.read().tfqf().bits() {
-            return Err(Error::FifoFull);
-        }
-        Ok(self.can.txfqs.read().tfqpi().bits() as usize)
-    }
-
-    fn send_fifo(&mut self, message: C::TxMessage) -> Result<()> {
-        // Get current put index
-        let index = self.put()?;
-
-        self.memory
-            .tx_buffers
-            .get_mut(index)
-            .ok_or(Error::OutOfBounds)?
-            .set(message);
-
-        // Flag the add request
-        self.transmit_fifo(index)
-    }
-}
-
-impl<Id: crate::CanId, const N: usize, D: crate::Dependencies<Id>, C> CanSendSlice<C>
-    for Can<'_, Id, D, C>
-where
-    C: Capacities<TxMessage = tx::Message<N>>,
-{
-    fn send_slice(&mut self, id: embedded_can::Id, data: &[u8]) -> Result<()> {
-        let message = tx::MessageBuilder {
-            id,
-            frame_contents: tx::FrameContents::Data(data),
-            frame_format: tx::FrameFormat::Classic,
-            store_tx_event: None,
-        }
-        .build()?;
-        self.send_fifo(message)
-    }
-}
-
 impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id, D, C> {
     /// Create new can peripheral.
     ///
@@ -669,7 +529,6 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
             filters_standard: &mut memory.filters_standard,
             filters_extended: &mut memory.filters_extended,
             _tx_event_fifo: &mut memory.tx_event_fifo,
-            tx_buffers: &mut memory.tx_buffers,
         };
         let mut bus = Self {
             can,
@@ -685,6 +544,7 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
             rx_dedicated_buffers: unsafe {
                 RxDedicatedBuffer::new(&mut memory.rx_dedicated_buffers)
             },
+            tx: unsafe { Tx::new(&mut memory.tx_buffers) },
         };
 
         bus.enter_config_mode();
