@@ -1,5 +1,5 @@
 //! Memory management for the RAM interface between core and peripheral.
-use super::message::{rx, tx};
+use super::message::{rx, tx, TxEvent};
 use core::mem::MaybeUninit;
 use generic_array::{
     typenum::{consts::*, IsLessOrEqual, LeEq, Same},
@@ -48,10 +48,6 @@ where
 {
 }
 
-/// TX event in the peripheral's representation
-#[repr(C)]
-#[derive(Default, Copy, Clone)]
-pub struct TxEvent(pub(super) [u32; 3]);
 /// 11-bit filter in the peripheral's representation
 #[repr(C)]
 #[derive(Default, Copy, Clone)]
@@ -80,7 +76,6 @@ pub(super) struct UnsplitMemory<'a, C: Capacities> {
         &'a mut GenericArray<VolatileCell<FilterStandardId>, C::StandardFilters>,
     pub(super) filters_extended:
         &'a mut GenericArray<VolatileCell<FilterExtendedId>, C::ExtendedFilters>,
-    pub(super) _tx_event_fifo: &'a mut GenericArray<VolatileCell<TxEvent>, C::TxEventFifo>,
 }
 
 /// Memory shared between the peripheral and core. Provide a struct `C` that

@@ -5,6 +5,7 @@ use crate::reg::{ecr::R as ECR, psr::R as PSR};
 use crate::rx_dedicated_buffers::RxDedicatedBuffer;
 use crate::rx_fifo::{Fifo0, Fifo1, RxFifo};
 use crate::tx_buffers::Tx;
+use crate::tx_event_fifo::TxEventFifo;
 use core::convert::From;
 use core::fmt::{self, Debug};
 
@@ -178,6 +179,7 @@ pub struct Can<'a, Id, D, C: Capacities> {
     pub rx_fifo_1: RxFifo<'a, Fifo1, Id, C::RxFifo1, C::RxFifo1Message>,
     pub rx_dedicated_buffers: RxDedicatedBuffer<'a, Id, C::DedicatedRxBuffers, C::RxBufferMessage>,
     pub tx: Tx<'a, Id, C>,
+    pub tx_event_fifo: TxEventFifo<'a, Id, C::TxEventFifo>,
 }
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
@@ -528,7 +530,6 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
         let unsplit_memory = UnsplitMemory {
             filters_standard: &mut memory.filters_standard,
             filters_extended: &mut memory.filters_extended,
-            _tx_event_fifo: &mut memory.tx_event_fifo,
         };
         let mut bus = Self {
             can,
@@ -545,6 +546,7 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
                 RxDedicatedBuffer::new(&mut memory.rx_dedicated_buffers)
             },
             tx: unsafe { Tx::new(&mut memory.tx_buffers) },
+            tx_event_fifo: unsafe { TxEventFifo::new(&mut memory.tx_event_fifo) },
         };
 
         bus.enter_config_mode();

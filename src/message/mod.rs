@@ -2,6 +2,9 @@
 
 pub mod rx;
 pub mod tx;
+mod tx_event;
+
+pub use tx_event::{TxEvent, TxEventType};
 
 use core::cmp::min;
 use embedded_can::{ExtendedId, Frame, Id, StandardId};
