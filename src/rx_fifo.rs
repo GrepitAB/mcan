@@ -1,12 +1,11 @@
 use crate::message::rx;
 use crate::reg;
 use core::marker::PhantomData;
-use generic_array::{ArrayLength, GenericArray};
 use vcell::VolatileCell;
 
 /// Receive FIFO `F` on peripheral `P`.
-pub struct RxFifo<'a, F, P, L: ArrayLength<VolatileCell<M>>, M: rx::AnyMessage> {
-    memory: &'a mut GenericArray<VolatileCell<M>, L>,
+pub struct RxFifo<'a, F, P, M: rx::AnyMessage> {
+    memory: &'a mut [VolatileCell<M>],
     _markers: PhantomData<(F, P)>,
 }
 
@@ -21,23 +20,18 @@ pub trait GetRxFifoRegs {
     /// Direct access can break assumptions made by the abstraction.
     unsafe fn registers(&self) -> &reg::RxFifoRegs;
 }
-impl<'a, P: crate::CanId, L: ArrayLength<VolatileCell<M>>, M: rx::AnyMessage> GetRxFifoRegs
-    for RxFifo<'a, Fifo0, P, L, M>
-{
+impl<'a, P: crate::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'a, Fifo0, P, M> {
     unsafe fn registers(&self) -> &reg::RxFifoRegs {
         &(*P::ADDRESS).rxf0
     }
 }
-impl<'a, P: crate::CanId, L: ArrayLength<VolatileCell<M>>, M: rx::AnyMessage> GetRxFifoRegs
-    for RxFifo<'a, Fifo1, P, L, M>
-{
+impl<'a, P: crate::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'a, Fifo1, P, M> {
     unsafe fn registers(&self) -> &reg::RxFifoRegs {
         &(*P::ADDRESS).rxf1
     }
 }
 
-impl<'a, F, P: crate::CanId, L: ArrayLength<VolatileCell<M>>, M: rx::AnyMessage>
-    RxFifo<'a, F, P, L, M>
+impl<'a, F, P: crate::CanId, M: rx::AnyMessage> RxFifo<'a, F, P, M>
 where
     Self: GetRxFifoRegs,
 {
@@ -49,7 +43,7 @@ where
     /// - RXFC
     /// - RXFS
     /// - RXFA
-    pub(crate) unsafe fn new(memory: &'a mut GenericArray<VolatileCell<M>, L>) -> Self {
+    pub(crate) unsafe fn new(memory: &'a mut [VolatileCell<M>]) -> Self {
         Self {
             memory,
             _markers: PhantomData,

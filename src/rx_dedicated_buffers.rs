@@ -2,18 +2,15 @@ use crate::bus;
 use crate::message::rx;
 use crate::reg;
 use core::marker::PhantomData;
-use generic_array::{ArrayLength, GenericArray};
 use vcell::VolatileCell;
 
 /// Dedicated receive buffers on peripheral `P`
-pub struct RxDedicatedBuffer<'a, P, L: ArrayLength<VolatileCell<M>>, M: rx::AnyMessage> {
-    memory: &'a mut GenericArray<VolatileCell<M>, L>,
+pub struct RxDedicatedBuffer<'a, P, M: rx::AnyMessage> {
+    memory: &'a mut [VolatileCell<M>],
     _markers: PhantomData<P>,
 }
 
-impl<'a, P: crate::CanId, L: ArrayLength<VolatileCell<M>>, M: rx::AnyMessage>
-    RxDedicatedBuffer<'a, P, L, M>
-{
+impl<'a, P: crate::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
     /// # Safety
     /// The caller must be the owner or the peripheral referenced by `P`. The
     /// constructed type assumes ownership of some of the registers from the
@@ -21,7 +18,7 @@ impl<'a, P: crate::CanId, L: ArrayLength<VolatileCell<M>>, M: rx::AnyMessage>
     /// keep multiple instances for the same peripheral.
     /// - NDAT1
     /// - NDAT2
-    pub(crate) unsafe fn new(memory: &'a mut GenericArray<VolatileCell<M>, L>) -> Self {
+    pub(crate) unsafe fn new(memory: &'a mut [VolatileCell<M>]) -> Self {
         Self {
             memory,
             _markers: PhantomData,

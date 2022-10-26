@@ -1,16 +1,15 @@
 use crate::message::TxEvent;
 use crate::reg;
 use core::marker::PhantomData;
-use generic_array::{ArrayLength, GenericArray};
 use vcell::VolatileCell;
 
 /// Transmit event queue on peripheral `P`
-pub struct TxEventFifo<'a, P, L: ArrayLength<VolatileCell<TxEvent>>> {
-    memory: &'a mut GenericArray<VolatileCell<TxEvent>, L>,
+pub struct TxEventFifo<'a, P> {
+    memory: &'a mut [VolatileCell<TxEvent>],
     _markers: PhantomData<P>,
 }
 
-impl<'a, P: crate::CanId, L: ArrayLength<VolatileCell<TxEvent>>> TxEventFifo<'a, P, L> {
+impl<'a, P: crate::CanId> TxEventFifo<'a, P> {
     /// # Safety
     /// The caller must be the owner or the peripheral referenced by `P`. The
     /// constructed type assumes ownership of some of the registers from the
@@ -18,7 +17,7 @@ impl<'a, P: crate::CanId, L: ArrayLength<VolatileCell<TxEvent>>> TxEventFifo<'a,
     /// keep multiple instances for the same peripheral.
     /// - TXEFS
     /// - TXEFA
-    pub(crate) unsafe fn new(memory: &'a mut GenericArray<VolatileCell<TxEvent>, L>) -> Self {
+    pub(crate) unsafe fn new(memory: &'a mut [VolatileCell<TxEvent>]) -> Self {
         Self {
             memory,
             _markers: PhantomData,

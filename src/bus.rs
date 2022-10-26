@@ -175,11 +175,11 @@ pub struct Can<'a, Id, D, C: Capacities> {
     memory: UnsplitMemory<'a, C>,
     /// Controls enabling and line selection of interrupts.
     pub interrupts: InterruptConfiguration<Id>,
-    pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0, C::RxFifo0Message>,
-    pub rx_fifo_1: RxFifo<'a, Fifo1, Id, C::RxFifo1, C::RxFifo1Message>,
-    pub rx_dedicated_buffers: RxDedicatedBuffer<'a, Id, C::DedicatedRxBuffers, C::RxBufferMessage>,
+    pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0Message>,
+    pub rx_fifo_1: RxFifo<'a, Fifo1, Id, C::RxFifo1Message>,
+    pub rx_dedicated_buffers: RxDedicatedBuffer<'a, Id, C::RxBufferMessage>,
     pub tx: Tx<'a, Id, C>,
-    pub tx_event_fifo: TxEventFifo<'a, Id, C::TxEventFifo>,
+    pub tx_event_fifo: TxEventFifo<'a, Id>,
 }
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
