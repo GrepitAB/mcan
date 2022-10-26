@@ -1,8 +1,94 @@
 //! Message filters
-use super::messageram;
+use core::marker::PhantomData;
 use embedded_can::{ExtendedId, StandardId};
+use vcell::VolatileCell;
+
+/// Acceptance filters for incoming messages
+pub struct Filters<'a, P> {
+    memory_standard: &'a mut [VolatileCell<FilterStandardId>],
+    memory_extended: &'a mut [VolatileCell<FilterExtendedId>],
+    len_standard: usize,
+    len_extended: usize,
+    _markers: PhantomData<P>,
+}
+
+impl<'a, P> Filters<'a, P> {
+    /// # Safety
+    /// All filters are assumed to be disabled initially. This is the case if
+    /// the memory is zeroed.
+    ///
+    /// Notably, `Filters` does not assume ownership over the filter-related
+    /// registers, as we need to know we are in initialization mode for their
+    /// access to be safe.
+    pub(crate) unsafe fn new(
+        memory_standard: &'a mut [VolatileCell<FilterStandardId>],
+        memory_extended: &'a mut [VolatileCell<FilterExtendedId>],
+    ) -> Self {
+        Self {
+            memory_standard,
+            memory_extended,
+            len_standard: 0,
+            len_extended: 0,
+            _markers: PhantomData,
+        }
+    }
+
+    /// Overwrites the `filter` at `index`.
+    /// Returns back the `filter` if the `index` is out of range.
+    fn set_filter<T: Copy, F: Copy + Into<T>>(
+        memory: &mut [VolatileCell<T>],
+        index: usize,
+        filter: F,
+    ) -> Result<(), F> {
+        memory
+            .get_mut(index)
+            .map(|f| f.set(filter.into()))
+            .ok_or(filter)
+    }
+
+    /// Appends a `filter` to the back of the list. Returns the assigned index
+    /// if successful. Returns back the `filter` if the list is full.
+    fn push_filter<T: Copy, F: Copy + Into<T>>(
+        memory: &mut [VolatileCell<T>],
+        len: &mut usize,
+        filter: F,
+    ) -> Result<usize, F> {
+        let index = *len;
+        Self::set_filter(memory, index, filter)?;
+        *len += 1;
+        Ok(index)
+    }
+
+    /// Appends a `filter` to the back of the list. Returns the assigned index
+    /// if successful. Returns back the `filter` if the list is full.
+    pub fn push_standard<F: Copy + Into<FilterStandardId>>(
+        &mut self,
+        filter: F,
+    ) -> Result<usize, F> {
+        Self::push_filter(self.memory_standard, &mut self.len_standard, filter)
+    }
+
+    /// Appends a `filter` to the back of the list. Returns the assigned index
+    /// if successful. Returns back the `filter` if the list is full.
+    pub fn push_extended<F: Copy + Into<FilterExtendedId>>(
+        &mut self,
+        filter: F,
+    ) -> Result<usize, F> {
+        Self::push_filter(self.memory_extended, &mut self.len_extended, filter)
+    }
+}
+
+/// 11-bit filter in the peripheral's representation
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct FilterStandardId(pub(super) u32);
+/// 29-bit filter in the peripheral's representation
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct FilterExtendedId(pub(super) [u32; 2]);
 
 /// Message filter field for 11-bit RX messages
+#[derive(Copy, Clone)]
 pub enum Filter {
     /// Range filter from low to high IDs
     Range {
@@ -44,6 +130,7 @@ pub enum Filter {
 }
 
 /// Store buffer message types
+#[derive(Copy, Clone)]
 pub enum SbMsgType {
     /// Store into RX buffer slot poitner to by id
     RxBuffer = 0,
@@ -62,6 +149,7 @@ impl Default for SbMsgType {
 }
 
 /// Message filter field for 28-bit RX messages
+#[derive(Copy, Clone)]
 pub enum ExtFilter {
     /// Range filter from low to high IDs with XIDAM
     MaskedRange {
@@ -112,6 +200,7 @@ pub enum ExtFilter {
 }
 
 /// Filter element configurations
+#[derive(Copy, Clone)]
 pub enum ElementConfig {
     /// Disable filter element
     Disable,
@@ -143,8 +232,8 @@ impl Into<u32> for ElementConfig {
     }
 }
 
-impl Into<messageram::FilterStandardId> for Filter {
-    fn into(self) -> messageram::FilterStandardId {
+impl Into<FilterStandardId> for Filter {
+    fn into(self) -> FilterStandardId {
         let v = match self {
             Filter::Range { action, high, low } => {
                 let action: u32 = action.into();
@@ -181,12 +270,12 @@ impl Into<messageram::FilterStandardId> for Filter {
             }
         };
 
-        messageram::FilterStandardId(v)
+        FilterStandardId(v)
     }
 }
 
-impl Into<messageram::FilterExtendedId> for ExtFilter {
-    fn into(self) -> messageram::FilterExtendedId {
+impl Into<FilterExtendedId> for ExtFilter {
+    fn into(self) -> FilterExtendedId {
         let (v1, v2) = match self {
             ExtFilter::MaskedRange { action, high, low } => {
                 let action: u32 = action.into();
@@ -221,6 +310,6 @@ impl Into<messageram::FilterExtendedId> for ExtFilter {
                 (msg_type as u32) << 9 | (offset << 0) as u32,
             ),
         };
-        messageram::FilterExtendedId([v1, v2])
+        FilterExtendedId([v1, v2])
     }
 }

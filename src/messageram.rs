@@ -1,5 +1,6 @@
 //! Memory management for the RAM interface between core and peripheral.
-use super::message::{rx, tx, TxEvent};
+use crate::filter::{FilterExtendedId, FilterStandardId};
+use crate::message::{rx, tx, TxEvent};
 use core::mem::MaybeUninit;
 use generic_array::{
     typenum::{consts::*, IsLessOrEqual, LeEq, Same},
@@ -48,15 +49,6 @@ where
 {
 }
 
-/// 11-bit filter in the peripheral's representation
-#[repr(C)]
-#[derive(Default, Copy, Clone)]
-pub struct FilterStandardId(pub(super) u32);
-/// 29-bit filter in the peripheral's representation
-#[repr(C)]
-#[derive(Default, Copy, Clone)]
-pub struct FilterExtendedId(pub(super) [u32; 2]);
-
 #[repr(C)]
 pub(super) struct SharedMemoryInner<C: Capacities> {
     pub(super) filters_standard: GenericArray<VolatileCell<FilterStandardId>, C::StandardFilters>,
@@ -67,15 +59,6 @@ pub(super) struct SharedMemoryInner<C: Capacities> {
         GenericArray<VolatileCell<C::RxBufferMessage>, C::DedicatedRxBuffers>,
     pub(super) tx_event_fifo: GenericArray<VolatileCell<TxEvent>, C::TxEventFifo>,
     pub(super) tx_buffers: GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
-}
-
-/// Holds the parts of SharedMemory that are not yet borrowed by sub-structs
-/// like `RxFifo`.
-pub(super) struct UnsplitMemory<'a, C: Capacities> {
-    pub(super) filters_standard:
-        &'a mut GenericArray<VolatileCell<FilterStandardId>, C::StandardFilters>,
-    pub(super) filters_extended:
-        &'a mut GenericArray<VolatileCell<FilterExtendedId>, C::ExtendedFilters>,
 }
 
 /// Memory shared between the peripheral and core. Provide a struct `C` that

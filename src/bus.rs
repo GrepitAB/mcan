@@ -1,5 +1,6 @@
 //! Pad declarations for the CAN buses
 
+use crate::filter::Filters;
 use crate::messageram::SharedMemoryInner;
 use crate::reg::{ecr::R as ECR, psr::R as PSR};
 use crate::rx_dedicated_buffers::RxDedicatedBuffer;
@@ -14,9 +15,8 @@ use super::{
         bus::{CanConfig, CanFdMode, InterruptConfiguration, TestMode},
         RamConfig,
     },
-    filter::{ExtFilter, Filter},
     message::{self, AnyMessage},
-    messageram::{Capacities, SharedMemory, UnsplitMemory},
+    messageram::{Capacities, SharedMemory},
 };
 use fugit::{HertzU32, RateExtU32};
 use generic_array::typenum::Unsigned;
@@ -153,10 +153,6 @@ pub trait CanBus {
     fn loopback(&mut self, state: bool);
     /// Enable/disable CAN-FD mode
     fn fd(&mut self, state: bool);
-    /// Write a filter object to the standard filter block
-    fn set_filter(&mut self, index: usize, filter: Filter) -> Result<()>;
-    /// Write a filter object to the extended filter block
-    fn set_ext_filter(&mut self, index: usize, filter: ExtFilter) -> Result<()>;
     /// Enable can device configuration mode
     fn enter_config_mode(&mut self);
     /// Enable can device operational mode
@@ -172,7 +168,6 @@ pub struct Can<'a, Id, D, C: Capacities> {
     /// For memory safety, all constructors must ensure that the memory is
     /// initialized.
     dependencies: D,
-    memory: UnsplitMemory<'a, C>,
     /// Controls enabling and line selection of interrupts.
     pub interrupts: InterruptConfiguration<Id>,
     pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0Message>,
@@ -180,6 +175,7 @@ pub struct Can<'a, Id, D, C: Capacities> {
     pub rx_dedicated_buffers: RxDedicatedBuffer<'a, Id, C::RxBufferMessage>,
     pub tx: Tx<'a, Id, C>,
     pub tx_event_fifo: TxEventFifo<'a, Id>,
+    pub filters: Filters<'a, Id>,
 }
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
@@ -462,24 +458,6 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
         self.enter_operational_mode();
     }
 
-    fn set_filter(&mut self, index: usize, filter: Filter) -> Result<()> {
-        self.memory
-            .filters_standard
-            .get_mut(index)
-            .ok_or(Error::OutOfBounds)?
-            .set(filter.into());
-        Ok(())
-    }
-
-    fn set_ext_filter(&mut self, index: usize, filter: ExtFilter) -> Result<()> {
-        self.memory
-            .filters_extended
-            .get_mut(index)
-            .ok_or(Error::OutOfBounds)?
-            .set(filter.into());
-        Ok(())
-    }
-
     /// Enter configuration mode
     fn enter_config_mode(&mut self) {
         self.can.cccr.modify(|_, w| w.init().set_bit());
@@ -527,14 +505,9 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
         let memory = memory.init();
         Self::apply_ram_config(&can, memory, &ram_cfg).unwrap();
 
-        let unsplit_memory = UnsplitMemory {
-            filters_standard: &mut memory.filters_standard,
-            filters_extended: &mut memory.filters_extended,
-        };
         let mut bus = Self {
             can,
             dependencies,
-            memory: unsplit_memory,
             // Safety: Since `Can::new` takes a PAC singleton, it can only be called once. Then no
             // duplicates will be constructed. The registers that are delegated to these components
             // should not be touched by any other code. This has to be upheld by all code that has
@@ -547,6 +520,10 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
             },
             tx: unsafe { Tx::new(&mut memory.tx_buffers) },
             tx_event_fifo: unsafe { TxEventFifo::new(&mut memory.tx_event_fifo) },
+            // Safety: The memory is zeroed by `memory.init`, so all filters are initially disabled.
+            filters: unsafe {
+                Filters::new(&mut memory.filters_standard, &mut memory.filters_extended)
+            },
         };
 
         bus.enter_config_mode();
