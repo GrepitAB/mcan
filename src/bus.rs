@@ -98,15 +98,6 @@ pub enum ConfigurationError {
 /// Index is out of bounds
 pub struct OutOfBounds;
 
-/// Token for identifying bus during runtime
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum BusSlot {
-    /// Peripheral 0
-    Can0,
-    /// Peripheral 1
-    Can1,
-}
-
 /// Common CANbus functionality
 /// TODO: build interrupt struct around this
 pub trait CanBus {
