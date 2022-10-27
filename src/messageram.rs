@@ -89,3 +89,11 @@ impl<C: Capacities> SharedMemory<C> {
         SYSTEM_RAM <= start && end_exclusive - SYSTEM_RAM <= 1 << 16
     }
 }
+
+impl<C: Capacities> SharedMemoryInner<C> {
+    pub fn is_addressable(&self) -> bool {
+        let start = self as *const _ as usize;
+        let end_exclusive = start + core::mem::size_of::<Self>();
+        SYSTEM_RAM <= start && end_exclusive - SYSTEM_RAM <= 1 << 16
+    }
+}
