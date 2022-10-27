@@ -163,11 +163,6 @@ pub trait CanBus {
 
 /// A CAN bus
 pub struct Can<'a, Id, D, C: Capacities> {
-    /// CAN bus peripheral
-    pub can: crate::reg::Can<Id>,
-    /// For memory safety, all constructors must ensure that the memory is
-    /// initialized.
-    dependencies: D,
     /// Controls enabling and line selection of interrupts.
     pub interrupts: InterruptConfiguration<Id>,
     pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0Message>,
@@ -176,9 +171,29 @@ pub struct Can<'a, Id, D, C: Capacities> {
     pub tx: Tx<'a, Id, C>,
     pub tx_event_fifo: TxEventFifo<'a, Id>,
     pub filters: Filters<'a, Id>,
+
+    /// Implementation details. The field is public to allow destructuring.
+    pub internals: Internals<Id, D>,
+}
+
+/// Implementation details.
+pub struct Internals<Id, D> {
+    /// CAN bus peripheral
+    can: crate::reg::Can<Id>,
+    dependencies: D,
 }
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
+    /// Raw access to the registers.
+    ///
+    /// # Safety
+    /// The abstraction assumes that it has exclusive ownership of the
+    /// registers. Direct access can break such assumptions. Direct access
+    /// can break assumptions
+    pub unsafe fn registers(&self) -> &crate::reg::Can<Id> {
+        &self.internals.can
+    }
+
     /// Apply parameters from a bus config struct
     /// Safety: Config may only be applied safely if the bus is initializing,
     ///         if the bus is not initializing, an error is returned
@@ -187,13 +202,13 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
             return Err(Error::InvalidTimeStampPrescaler);
         }
 
-        if !self.can.cccr.read().init().bit() {
+        if !self.internals.can.cccr.read().init().bit() {
             return Err(Error::NotInitializing);
         } else {
             // Baud rate
             // TODO: rewrite this somewhat when we're required to implement variable data
             // rate!
-            let c = self.dependencies.can_clock().to_Hz();
+            let c = self.internals.dependencies.can_clock().to_Hz();
             let f = freq.to_Hz();
             let q = config.timing.quanta();
 
@@ -237,7 +252,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                 return Err(Error::BitTimeRounding(real_output.Hz()));
             } else {
                 unsafe {
-                    self.can.nbtp.write(|w| {
+                    self.internals.can.nbtp.write(|w| {
                         w.nsjw()
                             .bits(config.timing.sjw)
                             .ntseg1()
@@ -248,7 +263,7 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                             .bits((divider - 1) as u16)
                     });
 
-                    self.can.tscc.write(|w| {
+                    self.internals.can.tscc.write(|w| {
                         w.tss()
                             .bits(config.timing.ts_select.into())
                             // Prescaler is 1 + tcp value.
@@ -257,16 +272,18 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
                     });
 
                     // CAN-FD operation
-                    self.can
+                    self.internals
+                        .can
                         .cccr
                         .modify(|_, w| w.fdoe().bit(config.fd_mode.clone().into()));
                     // HACK: Data bitrate is 1Mb/s
-                    self.can.dbtp.modify(|_, w| w.dbrp().bits(2));
-                    self.can
+                    self.internals.can.dbtp.modify(|_, w| w.dbrp().bits(2));
+                    self.internals
+                        .can
                         .cccr
                         .modify(|_, w| w.brse().bit(config.bit_rate_switching));
                     // Global filter options
-                    self.can.gfc.write(|w| {
+                    self.internals.can.gfc.write(|w| {
                         w.anfs()
                             .bits(config.nm_std.clone().into())
                             .anfe()
@@ -392,19 +409,22 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
 
     /// Configure test mode
     fn set_fd(&mut self, fd: CanFdMode) {
-        self.can.cccr.modify(|_, w| w.fdoe().bit(fd.clone().into()));
+        self.internals
+            .can
+            .cccr
+            .modify(|_, w| w.fdoe().bit(fd.clone().into()));
     }
 
     /// Configure test mode
     fn set_test(&mut self, test: TestMode) {
         match test {
             TestMode::Disabled => {
-                self.can.cccr.modify(|_, w| w.test().bit(false));
-                self.can.test.modify(|_, w| w.lbck().bit(false));
+                self.internals.can.cccr.modify(|_, w| w.test().bit(false));
+                self.internals.can.test.modify(|_, w| w.lbck().bit(false));
             }
             TestMode::Loopback => {
-                self.can.cccr.modify(|_, w| w.test().bit(true));
-                self.can.test.modify(|_, w| w.lbck().bit(true));
+                self.internals.can.cccr.modify(|_, w| w.test().bit(true));
+                self.internals.can.test.modify(|_, w| w.lbck().bit(true));
             }
         }
     }
@@ -412,11 +432,11 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
 
 impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can<'_, Id, D, C> {
     fn error_counters(&self) -> ErrorCounters {
-        self.can.ecr.read().into()
+        self.internals.can.ecr.read().into()
     }
 
     fn protocol_status(&self) -> ProtocolStatus {
-        self.can.psr.read().into()
+        self.internals.can.psr.read().into()
     }
 
     /// Set CAN FD mode
@@ -424,8 +444,8 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
         self.enter_config_mode();
 
         // Enable configuration change
-        self.can.cccr.modify(|_, w| w.cce().set_bit());
-        while !self.can.cccr.read().cce().bit() {
+        self.internals.can.cccr.modify(|_, w| w.cce().set_bit());
+        while !self.internals.can.cccr.read().cce().bit() {
             // TODO: Make sure this loop does not get optimized away
         }
 
@@ -443,8 +463,8 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
         self.enter_config_mode();
 
         // Enable configuration change
-        self.can.cccr.modify(|_, w| w.cce().set_bit());
-        while !self.can.cccr.read().cce().bit() {
+        self.internals.can.cccr.modify(|_, w| w.cce().set_bit());
+        while !self.internals.can.cccr.read().cce().bit() {
             // TODO: Make sure this loop does not get optimized away
         }
 
@@ -460,8 +480,8 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
 
     /// Enter configuration mode
     fn enter_config_mode(&mut self) {
-        self.can.cccr.modify(|_, w| w.init().set_bit());
-        while !self.can.cccr.read().init().bit() {
+        self.internals.can.cccr.modify(|_, w| w.init().set_bit());
+        while !self.internals.can.cccr.read().init().bit() {
             // TODO: Make sure this loop does not get optimized away
         }
     }
@@ -469,14 +489,14 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
     /// Enter operational mode
     fn enter_operational_mode(&mut self) {
         // Finish initializing peripheral
-        self.can.cccr.modify(|_, w| w.init().clear_bit());
-        while self.can.cccr.read().init().bit() {
+        self.internals.can.cccr.modify(|_, w| w.init().clear_bit());
+        while self.internals.can.cccr.read().init().bit() {
             // TODO: Make sure this loop does not get optimized away
         }
     }
 
     fn ts_count(&self) -> u16 {
-        self.can.tscv.read().tsc().bits()
+        self.internals.can.tscv.read().tsc().bits()
     }
 }
 
@@ -506,8 +526,6 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
         Self::apply_ram_config(&can, memory, &ram_cfg).unwrap();
 
         let mut bus = Self {
-            can,
-            dependencies,
             // Safety: Since `Can::new` takes a PAC singleton, it can only be called once. Then no
             // duplicates will be constructed. The registers that are delegated to these components
             // should not be touched by any other code. This has to be upheld by all code that has
@@ -524,13 +542,14 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id
             filters: unsafe {
                 Filters::new(&mut memory.filters_standard, &mut memory.filters_extended)
             },
+            internals: Internals { can, dependencies },
         };
 
         bus.enter_config_mode();
 
         // Enable configuration change
-        bus.can.cccr.modify(|_, w| w.cce().set_bit());
-        while !bus.can.cccr.read().cce().bit() {
+        bus.internals.can.cccr.modify(|_, w| w.cce().set_bit());
+        while !bus.internals.can.cccr.read().cce().bit() {
             // TODO: Make sure this loop does not get optimized away
         }
 
