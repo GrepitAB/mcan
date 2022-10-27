@@ -15,7 +15,7 @@ use super::{
         bus::{CanConfig, CanFdMode, InterruptConfiguration, TestMode},
         RamConfig,
     },
-    message::{self, AnyMessage},
+    message::AnyMessage,
     messageram::{Capacities, SharedMemory},
 };
 use fugit::{HertzU32, RateExtU32};
@@ -72,17 +72,9 @@ impl Debug for ErrorCounters {
     }
 }
 
-/// Errors that may occur in the CAN bus
+/// Errors that may during configuration
 #[derive(Debug)]
-pub enum Error {
-    /// The bus needs to be in initialization mode, but is not
-    NotInitializing,
-    /// Specified mask contains one or more invalid tx buffer indices
-    InvalidTxBuffer(u32),
-    /// Buffer index is not valid for any new data field
-    InvalidBufferIndex,
-    /// The buffer has no new data
-    BufferDataNotNew,
+pub enum ConfigurationError {
     /// Divider is too large for the peripheral
     InvalidDivider(f32),
     /// Generating the bitrate would require a division by less than one
@@ -97,18 +89,6 @@ pub enum Error {
     DividerIsNaN,
     /// Divider is f32 Inf
     DividerIsInf,
-    /// Specified filter is invalid
-    InvalidFilter,
-    /// Indexed offset is out of bounds
-    OutOfBounds,
-    /// Targeted FIFO did not have any data to output
-    FifoEmpty,
-    /// Targeted FIFO is full and more elements can't be added
-    FifoFull,
-    /// Element capcity was larger than container type
-    ElementOverflow,
-    /// Errors from message construction
-    MessageError(message::Error),
     /// Time stamp prescaler value is not in the range [1, 16]
     InvalidTimeStampPrescaler,
     /// The provided memory is not addressable by the peripheral.
@@ -117,21 +97,6 @@ pub enum Error {
 
 /// Index is out of bounds
 pub struct OutOfBounds;
-
-impl From<OutOfBounds> for Error {
-    fn from(_: OutOfBounds) -> Self {
-        Self::OutOfBounds
-    }
-}
-
-impl From<message::Error> for Error {
-    fn from(err: message::Error) -> Self {
-        Self::MessageError(err)
-    }
-}
-
-/// CAN bus results
-pub type Result<T> = core::result::Result<T, Error>;
 
 /// Token for identifying bus during runtime
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -204,9 +169,13 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
     }
 
     /// Apply parameters from a bus config struct
-    fn apply_bus_config(&mut self, config: &CanConfig, freq: HertzU32) -> Result<()> {
+    fn apply_bus_config(
+        &mut self,
+        config: &CanConfig,
+        freq: HertzU32,
+    ) -> Result<(), ConfigurationError> {
         if !(1..=16).contains(&config.timing.ts_prescale) {
-            return Err(Error::InvalidTimeStampPrescaler);
+            return Err(ConfigurationError::InvalidTimeStampPrescaler);
         }
 
         // Baud rate
@@ -218,9 +187,9 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
 
         // Sanity check input parameters
         if f == 0 {
-            return Err(Error::StoppedOutputClock);
+            return Err(ConfigurationError::StoppedOutputClock);
         } else if q == 0 {
-            return Err(Error::ZeroQuanta);
+            return Err(ConfigurationError::ZeroQuanta);
         }
 
         // Calculate divider
@@ -237,14 +206,14 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
         //     since it is generated from non-negative inputs it should be in range for
         //     u32
         let divider: u32 = if divider.is_nan() {
-            return Err(Error::DividerIsNaN);
+            return Err(ConfigurationError::DividerIsNaN);
         } else if divider.is_infinite() {
-            return Err(Error::DividerIsInf);
+            return Err(ConfigurationError::DividerIsInf);
         } else if divider < 1.0f32 {
             // Dividers of < 1 round down to 0
-            return Err(Error::ZeroDivider);
+            return Err(ConfigurationError::ZeroDivider);
         } else if divider >= 512.0f32 {
-            return Err(Error::InvalidDivider(divider));
+            return Err(ConfigurationError::InvalidDivider(divider));
         } else {
             unsafe { f32::to_int_unchecked(divider) }
         };
@@ -253,7 +222,7 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
         let real_output = c / (divider * q as u32);
 
         if real_output != f {
-            return Err(Error::BitTimeRounding(real_output.Hz()));
+            return Err(ConfigurationError::BitTimeRounding(real_output.Hz()));
         } else {
             unsafe {
                 self.0.internals.can.nbtp.write(|w| {
@@ -314,9 +283,9 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
         can: &crate::reg::Can<Id>,
         mem: &SharedMemoryInner<C>,
         config: &RamConfig,
-    ) -> Result<()> {
+    ) -> Result<(), ConfigurationError> {
         if !mem.is_addressable() {
-            return Err(Error::MemoryNotAddressable);
+            return Err(ConfigurationError::MemoryNotAddressable);
         }
 
         unsafe {
@@ -491,7 +460,7 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
         can_cfg: CanConfig,
         ram_cfg: RamConfig,
         memory: &'a mut SharedMemory<C>,
-    ) -> Result<Self> {
+    ) -> Result<Self, ConfigurationError> {
         // Safety:
         // Since `dependencies` field implies ownership of the HW register pointed to by
         // `Id: CanId`, `can` has a unique access to it
