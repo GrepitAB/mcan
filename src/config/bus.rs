@@ -374,8 +374,10 @@ impl From<Interrupt> for u32 {
     }
 }
 
+pub struct InvalidInterruptNumber;
+
 impl TryFrom<u8> for Interrupt {
-    type Error = ();
+    type Error = InvalidInterruptNumber;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         use Interrupt::*;
@@ -410,7 +412,7 @@ impl TryFrom<u8> for Interrupt {
             27 => ProtocolErrorArbitration,
             28 => ProtocolErrorData,
             29 => AccessToReservedAddress,
-            30.. => Err(())?,
+            30.. => Err(InvalidInterruptNumber)?,
         };
         Ok(ret)
     }
