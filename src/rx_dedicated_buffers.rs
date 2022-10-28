@@ -1,6 +1,7 @@
 use crate::bus;
 use crate::message::rx;
 use crate::reg;
+use core::convert::Infallible;
 use core::marker::PhantomData;
 use vcell::VolatileCell;
 
@@ -90,7 +91,7 @@ impl<'a, P: crate::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
     }
 
     /// Returns a received frame from any dedicated buffer if available
-    pub fn receive_any(&mut self) -> nb::Result<M, void::Void> {
+    pub fn receive_any(&mut self) -> nb::Result<M, Infallible> {
         self.memory
             .iter()
             .enumerate()

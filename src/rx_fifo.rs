@@ -1,5 +1,6 @@
 use crate::message::rx;
 use crate::reg;
+use core::convert::Infallible;
 use core::marker::PhantomData;
 use vcell::VolatileCell;
 
@@ -66,7 +67,7 @@ where
     }
 
     /// Returns a received frame if available
-    pub fn receive(&mut self) -> nb::Result<M, void::Void> {
+    pub fn receive(&mut self) -> nb::Result<M, Infallible> {
         let status = self.regs().s.read();
         let len = status.ffl().bits();
         if len == 0 {

@@ -17,4 +17,3 @@ fugit = "0.3.5"
 generic-array = "0.14"
 nb = "1.0"
 vcell = "0.1"
-void = { default-features = false, version = "1.0" }
