@@ -149,7 +149,7 @@ impl<'a, P: crate::CanId, C: Capacities> Tx<'a, P, C> {
     /// Note that the peripheral-level interrupt also needs to be enabled for
     /// interrupts to reach the system interrupt controller.
     ///
-    /// [`Interrupt::TransmissionCancellationFinished`]: crate::config::bus::Interrupt::TransmissionCancellationFinished
+    /// [`Interrupt::TransmissionCancellationFinished`]: crate::interrupt::Interrupt::TransmissionCancellationFinished
     pub fn enable_cancellation_interrupt(&mut self, buffers: TxBufferSet) {
         // Safety: There are no reserved bit patterns.
         unsafe {
@@ -160,7 +160,7 @@ impl<'a, P: crate::CanId, C: Capacities> Tx<'a, P, C> {
     /// Disallow [`Interrupt::TransmissionCancellationFinished`] to be triggered
     /// by `buffers`. Interrupts for other buffers remain unchanged.
     ///
-    /// [`Interrupt::TransmissionCancellationFinished`]: crate::config::bus::Interrupt::TransmissionCancellationFinished
+    /// [`Interrupt::TransmissionCancellationFinished`]: crate::interrupt::Interrupt::TransmissionCancellationFinished
     pub fn disable_cancellation_interrupt(&mut self, buffers: TxBufferSet) {
         // Safety: There are no reserved bit patterns.
         unsafe {
@@ -174,7 +174,7 @@ impl<'a, P: crate::CanId, C: Capacities> Tx<'a, P, C> {
     /// Note that the peripheral-level interrupt also needs to be enabled for
     /// interrupts to reach the system interrupt controller.
     ///
-    /// [`Interrupt::TransmissionCompleted`]: crate::config::bus::Interrupt::TransmissionCompleted
+    /// [`Interrupt::TransmissionCompleted`]: crate::interrupt::Interrupt::TransmissionCompleted
     pub fn enable_transmission_completed_interrupt(&mut self, buffers: TxBufferSet) {
         // Safety: There are no reserved bit patterns.
         unsafe {
@@ -185,7 +185,7 @@ impl<'a, P: crate::CanId, C: Capacities> Tx<'a, P, C> {
     /// Disallow [`Interrupt::TransmissionCompleted`] to be triggered by
     /// `buffers`. Interrupts for other buffers remain unchanged.
     ///
-    /// [`Interrupt::TransmissionCompleted`]: crate::config::bus::Interrupt::TransmissionCompleted
+    /// [`Interrupt::TransmissionCompleted`]: crate::interrupt::Interrupt::TransmissionCompleted
     pub fn disable_transmission_completed_interrupt(&mut self, buffers: TxBufferSet) {
         // Safety: There are no reserved bit patterns.
         unsafe {

@@ -1,6 +1,7 @@
 //! Pad declarations for the CAN buses
 
 use crate::filter::Filters;
+use crate::interrupt::InterruptConfiguration;
 use crate::messageram::SharedMemoryInner;
 use crate::reg::{ecr::R as ECR, psr::R as PSR};
 use crate::rx_dedicated_buffers::RxDedicatedBuffer;
@@ -12,7 +13,7 @@ use core::fmt::{self, Debug};
 
 use super::{
     config::{
-        bus::{CanConfig, CanFdMode, InterruptConfiguration, TestMode},
+        bus::{CanConfig, CanFdMode, TestMode},
         RamConfig,
     },
     message::AnyMessage,
@@ -157,6 +158,11 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
     /// Allows reconfiguring the acceptance filters.
     pub fn filters(&mut self) -> &mut Filters<'a, Id> {
         &mut self.0.internals.filters
+    }
+
+    /// Allows reconfiguring interrupts.
+    pub fn interrupts(&mut self) -> &mut InterruptConfiguration<Id> {
+        &mut self.0.interrupts
     }
 
     /// Apply parameters from a bus config struct

@@ -3,6 +3,7 @@
 pub mod bus;
 pub mod config;
 pub mod filter;
+pub mod interrupt;
 pub mod message;
 pub mod messageram;
 pub mod reg;
