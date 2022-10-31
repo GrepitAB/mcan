@@ -59,10 +59,12 @@ pub struct FilterExtendedId(pub(super) [u32; 2]);
 /// Message filter field for 11-bit RX messages
 #[derive(Copy, Clone)]
 pub enum Filter {
+    /// The filter is skipped
+    Disabled,
     /// Range filter from low to high IDs
     Range {
         /// Action to take on a matched element
-        action: ElementConfig,
+        action: Action,
         /// Lower filter limit
         low: StandardId,
         /// Upper filter limit
@@ -71,7 +73,7 @@ pub enum Filter {
     /// Filter for two IDs
     Dual {
         /// Action to take on a matched element
-        action: ElementConfig,
+        action: Action,
         /// Individual filter 1
         id1: StandardId,
         /// Individual filter 2
@@ -80,14 +82,14 @@ pub enum Filter {
     /// Traditional filter/mask CAN filter
     Classic {
         /// Action to take on a matched element
-        action: ElementConfig,
+        action: Action,
         /// ID filter
         filter: StandardId,
         /// ID mask
         mask: StandardId,
     },
     /// Store into RX buffer or as debug message (ignores filter type)
-    /// NOTE: Filter event pins SFID 8:6  are ignored for now
+    /// NOTE: Filter event pins are currently unsupported
     StoreBuffer {
         /// 11-bit filter ID 1
         id: StandardId,
@@ -120,10 +122,12 @@ impl Default for SbMsgType {
 /// Message filter field for 28-bit RX messages
 #[derive(Copy, Clone)]
 pub enum ExtFilter {
+    /// The filter is skipped
+    Disabled,
     /// Range filter from low to high IDs with XIDAM
     MaskedRange {
         /// Action to take on a matched element
-        action: ElementConfig,
+        action: Action,
         /// Lower filter limit
         low: ExtendedId,
         /// Upper filter limit
@@ -132,7 +136,7 @@ pub enum ExtFilter {
     /// Filter for two IDs
     Dual {
         /// Action to take on a matched element
-        action: ElementConfig,
+        action: Action,
         /// Individual filter 1
         id1: ExtendedId,
         /// Individual filter 2
@@ -141,7 +145,7 @@ pub enum ExtFilter {
     /// Traditional filter/mask CAN filter
     Classic {
         /// Action to take on a matched element
-        action: ElementConfig,
+        action: Action,
         /// ID filter
         filter: ExtendedId,
         /// ID mask
@@ -150,16 +154,16 @@ pub enum ExtFilter {
     /// Range filter from low to high IDs without XIDAM
     Range {
         /// Action to take on a matched element
-        action: ElementConfig,
+        action: Action,
         /// Lower filter limit
         low: ExtendedId,
         /// Upper filter limit
         high: ExtendedId,
     },
     /// Store into RX buffer or as debug message (ignores filter type)
-    /// NOTE: Filter event pins SFID 8:6  are ignored for now
+    /// NOTE: Filter event pins are currently unsupported
     StoreBuffer {
-        /// 11-bit filter ID 1
+        /// 29-bit filter ID 1
         id: ExtendedId,
         /// Special message type for StoreRxBuffer
         msg_type: SbMsgType,
@@ -170,9 +174,7 @@ pub enum ExtFilter {
 
 /// Filter element configurations
 #[derive(Copy, Clone)]
-pub enum ElementConfig {
-    /// Disable filter element
-    Disable,
+pub enum Action {
     /// Store in RX FIFO 0 if filter matches
     StoreFifo0,
     /// Store in RX FIFO 1 if filter matches
@@ -187,16 +189,15 @@ pub enum ElementConfig {
     PriorityFifo1,
 }
 
-impl Into<u32> for ElementConfig {
+impl Into<u32> for Action {
     fn into(self) -> u32 {
         match self {
-            ElementConfig::Disable => 0x0,
-            ElementConfig::StoreFifo0 => 0x1,
-            ElementConfig::StoreFifo1 => 0x2,
-            ElementConfig::Reject => 0x3,
-            ElementConfig::Priority => 0x4,
-            ElementConfig::PriorityFifo0 => 0x5,
-            ElementConfig::PriorityFifo1 => 0x6,
+            Action::StoreFifo0 => 0x1,
+            Action::StoreFifo1 => 0x2,
+            Action::Reject => 0x3,
+            Action::Priority => 0x4,
+            Action::PriorityFifo0 => 0x5,
+            Action::PriorityFifo1 => 0x6,
         }
     }
 }
@@ -204,6 +205,7 @@ impl Into<u32> for ElementConfig {
 impl Into<FilterStandardId> for Filter {
     fn into(self) -> FilterStandardId {
         let v = match self {
+            Filter::Disabled => 0,
             Filter::Range { action, high, low } => {
                 let action: u32 = action.into();
 
@@ -246,6 +248,7 @@ impl Into<FilterStandardId> for Filter {
 impl Into<FilterExtendedId> for ExtFilter {
     fn into(self) -> FilterExtendedId {
         let (v1, v2) = match self {
+            ExtFilter::Disabled => (0, 0),
             ExtFilter::MaskedRange { action, high, low } => {
                 let action: u32 = action.into();
 
