@@ -1,6 +1,6 @@
 //! Pad declarations for the CAN buses
 
-use crate::filter::Filters;
+use crate::filter::{FiltersExtended, FiltersStandard};
 use crate::interrupt::InterruptConfiguration;
 use crate::messageram::SharedMemoryInner;
 use crate::reg::{ecr::R as ECR, psr::R as PSR};
@@ -132,7 +132,8 @@ pub struct Internals<'a, Id, D> {
     /// CAN bus peripheral
     can: crate::reg::Can<Id>,
     dependencies: D,
-    filters: Filters<'a, Id>,
+    filters_standard: FiltersStandard<'a, Id>,
+    filters_extended: FiltersExtended<'a, Id>,
 }
 
 /// A CAN bus in configuration mode. Before messages can be sent and received,
@@ -155,9 +156,14 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
         self.0.registers()
     }
 
-    /// Allows reconfiguring the acceptance filters.
-    pub fn filters(&mut self) -> &mut Filters<'a, Id> {
-        &mut self.0.internals.filters
+    /// Allows reconfiguring the acceptance filters for standard IDs.
+    pub fn filters_standard(&mut self) -> &mut FiltersStandard<'a, Id> {
+        &mut self.0.internals.filters_standard
+    }
+
+    /// Allows reconfiguring the acceptance filters for extended IDs.
+    pub fn filters_extended(&mut self) -> &mut FiltersExtended<'a, Id> {
+        &mut self.0.internals.filters_extended
     }
 
     /// Allows reconfiguring interrupts.
@@ -484,9 +490,8 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
                 dependencies,
                 // Safety: The memory is zeroed by `memory.init`, so all filters are initially
                 // disabled.
-                filters: unsafe {
-                    Filters::new(&mut memory.filters_standard, &mut memory.filters_extended)
-                },
+                filters_standard: unsafe { FiltersStandard::new(&mut memory.filters_standard) },
+                filters_extended: unsafe { FiltersExtended::new(&mut memory.filters_extended) },
             },
         }
         .configure();

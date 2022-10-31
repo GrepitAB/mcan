@@ -3,16 +3,17 @@ use core::marker::PhantomData;
 use embedded_can::{ExtendedId, StandardId};
 use vcell::VolatileCell;
 
+pub type FiltersStandard<'a, P> = Filters<'a, P, FilterStandardId>;
+pub type FiltersExtended<'a, P> = Filters<'a, P, FilterExtendedId>;
+
 /// Acceptance filters for incoming messages
-pub struct Filters<'a, P> {
-    memory_standard: &'a mut [VolatileCell<FilterStandardId>],
-    memory_extended: &'a mut [VolatileCell<FilterExtendedId>],
-    len_standard: usize,
-    len_extended: usize,
+pub struct Filters<'a, P, T> {
+    memory: &'a mut [VolatileCell<T>],
+    len: usize,
     _markers: PhantomData<P>,
 }
 
-impl<'a, P> Filters<'a, P> {
+impl<'a, P, T: Copy> Filters<'a, P, T> {
     /// # Safety
     /// All filters are assumed to be disabled initially. This is the case if
     /// the memory is zeroed.
@@ -20,61 +21,29 @@ impl<'a, P> Filters<'a, P> {
     /// Notably, `Filters` does not assume ownership over the filter-related
     /// registers, as we need to know we are in initialization mode for their
     /// access to be safe.
-    pub(crate) unsafe fn new(
-        memory_standard: &'a mut [VolatileCell<FilterStandardId>],
-        memory_extended: &'a mut [VolatileCell<FilterExtendedId>],
-    ) -> Self {
+    pub(crate) unsafe fn new(memory: &'a mut [VolatileCell<T>]) -> Self {
         Self {
-            memory_standard,
-            memory_extended,
-            len_standard: 0,
-            len_extended: 0,
+            memory,
+            len: 0,
             _markers: PhantomData,
         }
     }
 
     /// Overwrites the `filter` at `index`.
     /// Returns back the `filter` if the `index` is out of range.
-    fn set_filter<T: Copy, F: Copy + Into<T>>(
-        memory: &mut [VolatileCell<T>],
-        index: usize,
-        filter: F,
-    ) -> Result<(), F> {
-        memory
+    fn set<F: Copy + Into<T>>(&mut self, index: usize, filter: F) -> Result<(), F> {
+        self.memory
             .get_mut(index)
             .map(|f| f.set(filter.into()))
             .ok_or(filter)
     }
-
     /// Appends a `filter` to the back of the list. Returns the assigned index
     /// if successful. Returns back the `filter` if the list is full.
-    fn push_filter<T: Copy, F: Copy + Into<T>>(
-        memory: &mut [VolatileCell<T>],
-        len: &mut usize,
-        filter: F,
-    ) -> Result<usize, F> {
-        let index = *len;
-        Self::set_filter(memory, index, filter)?;
-        *len += 1;
+    pub fn push<F: Copy + Into<T>>(&mut self, filter: F) -> Result<usize, F> {
+        let index = self.len;
+        self.set(index, filter)?;
+        self.len += 1;
         Ok(index)
-    }
-
-    /// Appends a `filter` to the back of the list. Returns the assigned index
-    /// if successful. Returns back the `filter` if the list is full.
-    pub fn push_standard<F: Copy + Into<FilterStandardId>>(
-        &mut self,
-        filter: F,
-    ) -> Result<usize, F> {
-        Self::push_filter(self.memory_standard, &mut self.len_standard, filter)
-    }
-
-    /// Appends a `filter` to the back of the list. Returns the assigned index
-    /// if successful. Returns back the `filter` if the list is full.
-    pub fn push_extended<F: Copy + Into<FilterExtendedId>>(
-        &mut self,
-        filter: F,
-    ) -> Result<usize, F> {
-        Self::push_filter(self.memory_extended, &mut self.len_extended, filter)
     }
 }
 
