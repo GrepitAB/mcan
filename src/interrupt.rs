@@ -441,12 +441,15 @@ impl<Id: crate::CanId> InterruptConfiguration<Id> {
     /// - IE
     /// - IR
     pub(crate) unsafe fn new() -> Self {
-        Self {
+        let v = Self {
             // Safety: this represents owning all of IR, which is ensured by the safety comment on
             // the constructor. The reserved bits are exluded.
             disabled: OwnedInterruptSet::new(InterruptSet(0x3fff_ffff)),
             _peripheral: PhantomData,
-        }
+        };
+        // Disable all interrupts on the peripheral by writing the reset value.
+        v.ils().write(|w| w);
+        v
     }
 
     fn ils(&self) -> &reg::ILS {
