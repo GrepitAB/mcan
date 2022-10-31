@@ -1,5 +1,6 @@
 //! Pad declarations for the CAN buses
 
+use crate::config::bus::{BitTimingError, DATA_BIT_TIMING_RANGES, NOMINAL_BIT_TIMING_RANGES};
 use crate::filter::{FiltersExtended, FiltersStandard};
 use crate::interrupt::InterruptConfiguration;
 use crate::messageram::SharedMemoryInner;
@@ -13,13 +14,12 @@ use core::fmt::{self, Debug};
 
 use super::{
     config::{
-        bus::{CanConfig, CanFdMode, TestMode},
+        bus::{CanConfig, FdFeatures, TestMode},
         RamConfig,
     },
     message::AnyMessage,
     messageram::{Capacities, SharedMemory},
 };
-use fugit::{HertzU32, RateExtU32};
 use generic_array::typenum::Unsigned;
 
 /// Printable PSR field
@@ -76,24 +76,18 @@ impl Debug for ErrorCounters {
 /// Errors that may during configuration
 #[derive(Debug)]
 pub enum ConfigurationError {
-    /// Divider is too large for the peripheral
-    InvalidDivider(f32),
-    /// Generating the bitrate would require a division by less than one
-    ZeroDivider,
-    /// Input clock / divider yields a poor integer division
-    BitTimeRounding(HertzU32),
-    /// Output clock is not supposed to be running
-    StoppedOutputClock,
-    /// The bit-time quanta is zero
-    ZeroQuanta,
-    /// Divider is f32 NaN
-    DividerIsNaN,
-    /// Divider is f32 Inf
-    DividerIsInf,
+    /// Problems with the bit timing configuration
+    BitTiming(BitTimingError),
     /// Time stamp prescaler value is not in the range [1, 16]
     InvalidTimeStampPrescaler,
     /// The provided memory is not addressable by the peripheral.
     MemoryNotAddressable,
+}
+
+impl From<BitTimingError> for ConfigurationError {
+    fn from(value: BitTimingError) -> Self {
+        Self::BitTiming(value)
+    }
 }
 
 /// Index is out of bounds
@@ -172,108 +166,82 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
     }
 
     /// Apply parameters from a bus config struct
-    fn apply_bus_config(
-        &mut self,
-        config: &CanConfig,
-        freq: HertzU32,
-    ) -> Result<(), ConfigurationError> {
-        if !(1..=16).contains(&config.timing.ts_prescale) {
+    fn apply_bus_config(&mut self, config: &CanConfig) -> Result<(), ConfigurationError> {
+        if !(1..=16).contains(&config.timestamp.prescaler) {
             return Err(ConfigurationError::InvalidTimeStampPrescaler);
         }
 
-        // Baud rate
-        // TODO: rewrite this somewhat when we're required to implement variable data
-        // rate!
-        let c = self.0.internals.dependencies.can_clock().to_Hz();
-        let f = freq.to_Hz();
-        let q = config.timing.quanta();
+        let nominal_prescaler = config.nominal_timing.prescaler(
+            self.0.internals.dependencies.can_clock(),
+            &NOMINAL_BIT_TIMING_RANGES,
+        )?;
 
-        // Sanity check input parameters
-        if f == 0 {
-            return Err(ConfigurationError::StoppedOutputClock);
-        } else if q == 0 {
-            return Err(ConfigurationError::ZeroQuanta);
-        }
+        unsafe {
+            self.0.internals.can.nbtp.write(|w| {
+                w.nsjw()
+                    .bits(config.nominal_timing.sjw)
+                    .ntseg1()
+                    .bits(config.nominal_timing.phase_seg_1)
+                    .ntseg2()
+                    .bits(config.nominal_timing.phase_seg_2)
+                    .nbrp()
+                    .bits(nominal_prescaler - 1)
+            });
 
-        // Calculate divider
-        let cf: f32 = c as f32;
-        let ff: f32 = f as f32;
-        let qf: f32 = q as f32;
-        let divider = cf / (ff * qf);
+            self.0.internals.can.tscc.write(|w| {
+                w.tss()
+                    .bits(config.timestamp.select.into())
+                    // Prescaler is 1 + tcp value.
+                    .tcp()
+                    .bits(config.timestamp.prescaler - 1)
+            });
 
-        // Convert divider to u32
-        // Safety: criterion and tested above, the divider is:
-        //   * Not `NaN`
-        //   * Not `Inf`
-        //   * Divider smaller than 512 implies that it is smaller than max u32 and
-        //     since it is generated from non-negative inputs it should be in range for
-        //     u32
-        let divider: u32 = if divider.is_nan() {
-            return Err(ConfigurationError::DividerIsNaN);
-        } else if divider.is_infinite() {
-            return Err(ConfigurationError::DividerIsInf);
-        } else if divider < 1.0f32 {
-            // Dividers of < 1 round down to 0
-            return Err(ConfigurationError::ZeroDivider);
-        } else if divider >= 512.0f32 {
-            return Err(ConfigurationError::InvalidDivider(divider));
-        } else {
-            unsafe { f32::to_int_unchecked(divider) }
-        };
-
-        // Compare the real output to the expected output
-        let real_output = c / (divider * q as u32);
-
-        if real_output != f {
-            Err(ConfigurationError::BitTimeRounding(real_output.Hz()))
-        } else {
-            unsafe {
-                self.0.internals.can.nbtp.write(|w| {
-                    w.nsjw()
-                        .bits(config.timing.sjw)
-                        .ntseg1()
-                        .bits(config.timing.phase_seg_1)
-                        .ntseg2()
-                        .bits(config.timing.phase_seg_2)
-                        .nbrp()
-                        .bits((divider - 1) as u16)
-                });
-
-                self.0.internals.can.tscc.write(|w| {
-                    w.tss()
-                        .bits(config.timing.ts_select.into())
-                        // Prescaler is 1 + tcp value.
-                        .tcp()
-                        .bits(config.timing.ts_prescale - 1)
-                });
-
-                // CAN-FD operation
-                self.0
+            match config.fd_mode {
+                FdFeatures::ClassicOnly => self
+                    .0
                     .internals
                     .can
                     .cccr
-                    .modify(|_, w| w.fdoe().bit(config.fd_mode.clone().into()));
-                // HACK: Data bitrate is 1Mb/s
-                self.0.internals.can.dbtp.modify(|_, w| w.dbrp().bits(2));
-                self.0
-                    .internals
-                    .can
-                    .cccr
-                    .modify(|_, w| w.brse().bit(config.bit_rate_switching));
-                // Global filter options
-                self.0.internals.can.gfc.write(|w| {
-                    w.anfs()
-                        .bits(config.nm_std.clone().into())
-                        .anfe()
-                        .bits(config.nm_ext.clone().into())
-                });
+                    .modify(|_, w| w.fdoe().clear_bit()),
+                FdFeatures::Fd {
+                    allow_bit_rate_switching,
+                    data_phase_timing,
+                } => {
+                    self.0
+                        .internals
+                        .can
+                        .cccr
+                        .modify(|_, w| w.fdoe().set_bit().brse().bit(allow_bit_rate_switching));
+                    let data_divider = data_phase_timing.prescaler(
+                        self.0.internals.dependencies.can_clock(),
+                        &DATA_BIT_TIMING_RANGES,
+                    )?;
+                    self.0.internals.can.dbtp.write(|w| {
+                        w.dsjw()
+                            .bits(data_phase_timing.sjw)
+                            .dtseg1()
+                            .bits(data_phase_timing.phase_seg_1)
+                            .dtseg2()
+                            .bits(data_phase_timing.phase_seg_2)
+                            .dbrp()
+                            .bits((data_divider - 1) as u8)
+                    });
+                }
+            };
 
-                // Configure test/loopback mode
-                self.set_test(config.test.clone());
-            }
+            // Global filter options
+            self.0.internals.can.gfc.write(|w| {
+                w.anfs()
+                    .bits(config.nm_std.into())
+                    .anfe()
+                    .bits(config.nm_ext.into())
+            });
 
-            Ok(())
+            // Configure test/loopback mode
+            self.set_test(config.test);
         }
+
+        Ok(())
     }
 
     /// Apply parameters from a ram config struct
@@ -375,12 +343,12 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
     }
 
     /// Configure test mode
-    pub fn set_fd(&mut self, fd: CanFdMode) {
+    pub fn set_fd(&mut self, fd: FdFeatures) {
         self.0
             .internals
             .can
             .cccr
-            .modify(|_, w| w.fdoe().bit(fd.clone().into()));
+            .modify(|_, w| w.fdoe().bit(matches!(fd, FdFeatures::Fd { .. })));
     }
 
     /// Configure test mode
@@ -459,7 +427,6 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
     /// finish configuration and start transmitting and receiving.
     pub fn new(
         dependencies: D,
-        freq: HertzU32,
         can_cfg: CanConfig,
         ram_cfg: RamConfig,
         memory: &'a mut SharedMemory<C>,
@@ -496,7 +463,7 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
         }
         .configure();
 
-        bus.apply_bus_config(&can_cfg, freq)?;
+        bus.apply_bus_config(&can_cfg)?;
         Ok(bus)
     }
 
