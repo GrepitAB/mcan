@@ -1,4 +1,6 @@
 #![no_std]
+// TODO: Enable when documentation is finished
+// #![warn(missing_docs)]
 
 pub mod bus;
 pub mod config;
