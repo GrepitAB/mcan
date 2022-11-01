@@ -225,7 +225,7 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
         let real_output = c / (divider * q as u32);
 
         if real_output != f {
-            return Err(ConfigurationError::BitTimeRounding(real_output.Hz()));
+            Err(ConfigurationError::BitTimeRounding(real_output.Hz()))
         } else {
             unsafe {
                 self.0.internals.can.nbtp.write(|w| {

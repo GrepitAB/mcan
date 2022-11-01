@@ -22,9 +22,9 @@ pub enum RxFifoMode {
     Overwrite,
 }
 
-impl Into<bool> for RxFifoMode {
-    fn into(self) -> bool {
-        match self {
+impl From<RxFifoMode> for bool {
+    fn from(val: RxFifoMode) -> Self {
+        match val {
             RxFifoMode::Overwrite => true,
             RxFifoMode::Blocking => false,
         }

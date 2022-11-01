@@ -35,7 +35,7 @@ impl From<crate::W<RXESC_SPEC>> for W {
     }
 }
 #[doc = "Rx FIFO 0 Data Field Size\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum F0DS_A {
     #[doc = "0: 8 byte data field"]
@@ -189,7 +189,7 @@ impl<'a> F0DS_W<'a> {
     }
 }
 #[doc = "Rx FIFO 1 Data Field Size\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum F1DS_A {
     #[doc = "0: 8 byte data field"]
@@ -343,7 +343,7 @@ impl<'a> F1DS_W<'a> {
     }
 }
 #[doc = "Rx Buffer Data Field Size\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum RBDS_A {
     #[doc = "0: 8 byte data field"]

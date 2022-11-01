@@ -29,7 +29,7 @@ impl core::ops::Deref for BIDX_R {
     }
 }
 #[doc = "Message Storage Indicator\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum MSI_A {
     #[doc = "0: No FIFO selected"]

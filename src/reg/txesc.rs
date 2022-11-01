@@ -35,7 +35,7 @@ impl From<crate::W<TXESC_SPEC>> for W {
     }
 }
 #[doc = "Tx Buffer Data Field Size\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TBDS_A {
     #[doc = "0: 8 byte data field"]

@@ -6,7 +6,7 @@ use super::*;
 /// configured to use. Only for the receive message format.
 pub trait AnyMessage: super::AnyMessage {
     /// Create a transmission object from rx object
-    fn as_tx_builder<'a>(&'a self) -> tx::MessageBuilder<'a>;
+    fn as_tx_builder(&'_ self) -> tx::MessageBuilder<'_>;
 
     /// Timestamp counter value captured on start of frame reception
     fn timestamp(&self) -> u16;
@@ -31,8 +31,8 @@ impl<const N: usize> super::Raw for Message<N> {
     fn id(&self) -> Id {
         self.0.id()
     }
-    fn len(&self) -> usize {
-        self.0.len()
+    fn decoded_dlc(&self) -> usize {
+        self.0.decoded_dlc()
     }
     fn dlc(&self) -> u8 {
         self.0.dlc()
@@ -61,7 +61,7 @@ impl<const N: usize> AnyMessage for Message<N>
 where
     Message<N>: super::AnyMessage,
 {
-    fn as_tx_builder<'a>(&'a self) -> tx::MessageBuilder<'a> {
+    fn as_tx_builder(&'_ self) -> tx::MessageBuilder<'_> {
         tx::MessageBuilder {
             id: self.id(),
             frame_contents: if self.is_remote_frame() {

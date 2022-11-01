@@ -66,7 +66,7 @@ impl<const N: usize> Frame for Message<N> {
         }
         .build()
         .ok()
-        .map(|m| Self::Tx(m))
+        .map(Self::Tx)
     }
 
     fn new_remote(id: impl Into<Id>, dlc: usize) -> Option<Self> {
@@ -83,7 +83,7 @@ impl<const N: usize> Frame for Message<N> {
         }
         .build()
         .ok()
-        .map(|m| Self::Tx(m))
+        .map(Self::Tx)
     }
 
     fn is_extended(&self) -> bool {
@@ -121,7 +121,7 @@ pub trait Raw {
     /// Returns the CAN identifier of the message
     fn id(&self) -> Id;
     /// Data length in bytes
-    fn len(&self) -> usize;
+    fn decoded_dlc(&self) -> usize;
     /// Data length code
     fn dlc(&self) -> u8;
     /// True if the header indicates that the frame uses the CAN FD format
@@ -154,7 +154,7 @@ impl<const N: usize> Raw for RawMessage<N> {
         }
     }
 
-    fn len(&self) -> usize {
+    fn decoded_dlc(&self) -> usize {
         dlc_to_len(self.dlc(), self.fd_format())
     }
 
@@ -173,7 +173,7 @@ impl<const N: usize> Raw for RawMessage<N> {
     fn data(&self) -> &[u8] {
         if !self.is_remote_frame() {
             self.data
-                .get(..min(self.len(), self.data.len()))
+                .get(..min(self.decoded_dlc(), self.data.len()))
                 .unwrap_or(&[])
         } else {
             &[]

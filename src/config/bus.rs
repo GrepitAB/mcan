@@ -66,12 +66,12 @@ pub enum NonMatchingAction {
     Reject,
 }
 
-impl Into<u8> for NonMatchingAction {
-    fn into(self) -> u8 {
-        match self {
-            Self::Fifo0 => 0,
-            Self::Fifo1 => 1,
-            Self::Reject => 2,
+impl From<NonMatchingAction> for u8 {
+    fn from(val: NonMatchingAction) -> Self {
+        match val {
+            NonMatchingAction::Fifo0 => 0,
+            NonMatchingAction::Fifo1 => 1,
+            NonMatchingAction::Reject => 2,
         }
     }
 }
@@ -91,11 +91,11 @@ pub enum CanFdMode {
     Fd,
 }
 
-impl Into<bool> for CanFdMode {
-    fn into(self) -> bool {
-        match self {
-            Self::Classic => false,
-            Self::Fd => true,
+impl From<CanFdMode> for bool {
+    fn from(val: CanFdMode) -> Self {
+        match val {
+            CanFdMode::Classic => false,
+            CanFdMode::Fd => true,
         }
     }
 }

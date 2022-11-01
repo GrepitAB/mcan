@@ -14,7 +14,7 @@ impl From<crate::R<PSR_SPEC>> for R {
     }
 }
 #[doc = "Last Error Code\n\nValue on reset: 7"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum LEC_A {
     #[doc = "0: No Error"]
@@ -111,7 +111,7 @@ impl core::ops::Deref for LEC_R {
     }
 }
 #[doc = "Activity\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ACT_A {
     #[doc = "0: Node is synchronizing on CAN communication"]
@@ -221,7 +221,7 @@ impl core::ops::Deref for BO_R {
     }
 }
 #[doc = "Data Phase Last Error Code\n\nValue on reset: 7"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum DLEC_A {
     #[doc = "0: No Error"]

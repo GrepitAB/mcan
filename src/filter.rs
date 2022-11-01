@@ -189,9 +189,9 @@ pub enum Action {
     PriorityFifo1,
 }
 
-impl Into<u32> for Action {
-    fn into(self) -> u32 {
-        match self {
+impl From<Action> for u32 {
+    fn from(val: Action) -> Self {
+        match val {
             Action::StoreFifo0 => 0x1,
             Action::StoreFifo1 => 0x2,
             Action::Reject => 0x3,
@@ -202,14 +202,14 @@ impl Into<u32> for Action {
     }
 }
 
-impl Into<FilterStandardId> for Filter {
-    fn into(self) -> FilterStandardId {
-        let v = match self {
+impl From<Filter> for FilterStandardId {
+    fn from(val: Filter) -> Self {
+        let v = match val {
             Filter::Disabled => 0,
             Filter::Range { action, high, low } => {
                 let action: u32 = action.into();
 
-                (high.as_raw() as u32) | ((low.as_raw() as u32) << 16) | (action << 27) | (0 << 30)
+                (high.as_raw() as u32) | ((low.as_raw() as u32) << 16) | (action << 27)
             }
             Filter::Dual { action, id1, id2 } => {
                 let action: u32 = action.into();
@@ -233,11 +233,8 @@ impl Into<FilterStandardId> for Filter {
                 msg_type,
                 offset,
             } => {
-                (id.as_raw() as u32) << 16
-                    | (msg_type as u32) << 9
-                    | (offset << 0) as u32
-                    | (0x7 << 27)
-                    | (0 << 30) // NOTE: ignored since FEC=STRXBUF
+                (id.as_raw() as u32) << 16 | (msg_type as u32) << 9 | offset as u32 | (0x7 << 27)
+                // NOTE: ignored since FEC=STRXBUF
             }
         };
 
@@ -245,14 +242,14 @@ impl Into<FilterStandardId> for Filter {
     }
 }
 
-impl Into<FilterExtendedId> for ExtFilter {
-    fn into(self) -> FilterExtendedId {
-        let (v1, v2) = match self {
+impl From<ExtFilter> for FilterExtendedId {
+    fn from(val: ExtFilter) -> Self {
+        let (v1, v2) = match val {
             ExtFilter::Disabled => (0, 0),
             ExtFilter::MaskedRange { action, high, low } => {
                 let action: u32 = action.into();
 
-                ((action << 29 | low.as_raw()), (0 << 30 | high.as_raw()))
+                ((action << 29 | low.as_raw()), high.as_raw())
             }
             ExtFilter::Dual { action, id1, id2 } => {
                 let action: u32 = action.into();
@@ -279,7 +276,7 @@ impl Into<FilterExtendedId> for ExtFilter {
                 offset,
             } => (
                 (0x7 << 29 | id.as_raw()),
-                (msg_type as u32) << 9 | (offset << 0) as u32,
+                (msg_type as u32) << 9 | offset as u32,
             ),
         };
         FilterExtendedId([v1, v2])

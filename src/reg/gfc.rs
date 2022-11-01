@@ -109,7 +109,7 @@ impl<'a> RRFS_W<'a> {
     }
 }
 #[doc = "Accept Non-matching Frames Extended\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ANFE_A {
     #[doc = "0: Accept in Rx FIFO 0"]
@@ -198,7 +198,7 @@ impl<'a> ANFE_W<'a> {
     }
 }
 #[doc = "Accept Non-matching Frames Standard\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ANFS_A {
     #[doc = "0: Accept in Rx FIFO 0"]

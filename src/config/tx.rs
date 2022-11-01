@@ -25,9 +25,9 @@ pub enum TxBufferMode {
     Queue,
 }
 
-impl Into<bool> for TxBufferMode {
-    fn into(self) -> bool {
-        match self {
+impl From<TxBufferMode> for bool {
+    fn from(val: TxBufferMode) -> Self {
+        match val {
             TxBufferMode::Queue => true,
             TxBufferMode::Fifo => false,
         }

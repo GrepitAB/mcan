@@ -35,7 +35,7 @@ impl From<crate::W<TSCC_SPEC>> for W {
     }
 }
 #[doc = "Timestamp Select\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TSS_A {
     #[doc = "0: Timestamp counter value always 0x0000"]

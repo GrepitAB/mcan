@@ -72,7 +72,7 @@ impl<'a> LBCK_W<'a> {
     }
 }
 #[doc = "Control of Transmit Pin\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TX_A {
     #[doc = "0: TX controlled by CAN core"]

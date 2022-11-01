@@ -72,7 +72,7 @@ impl<'a> ETOC_W<'a> {
     }
 }
 #[doc = "Timeout Select\n\nValue on reset: 0"]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TOS_A {
     #[doc = "0: Continuout operation"]

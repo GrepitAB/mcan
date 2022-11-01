@@ -6,8 +6,8 @@ impl Raw for TxEvent {
     fn id(&self) -> Id {
         self.0.id()
     }
-    fn len(&self) -> usize {
-        self.0.len()
+    fn decoded_dlc(&self) -> usize {
+        self.0.decoded_dlc()
     }
     fn dlc(&self) -> u8 {
         self.0.dlc()
