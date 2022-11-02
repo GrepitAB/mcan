@@ -176,70 +176,71 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
             &NOMINAL_BIT_TIMING_RANGES,
         )?;
 
-        unsafe {
-            self.0.internals.can.nbtp.write(|w| {
-                w.nsjw()
-                    .bits(config.nominal_timing.sjw)
-                    .ntseg1()
-                    .bits(config.nominal_timing.phase_seg_1)
-                    .ntseg2()
-                    .bits(config.nominal_timing.phase_seg_2)
-                    .nbrp()
-                    .bits(nominal_prescaler - 1)
-            });
+        // Safety: The configuration is checked to be valid when computing the prescaler
+        self.0.internals.can.nbtp.write(|w| unsafe {
+            w.nsjw()
+                .bits(config.nominal_timing.sjw)
+                .ntseg1()
+                .bits(config.nominal_timing.phase_seg_1)
+                .ntseg2()
+                .bits(config.nominal_timing.phase_seg_2)
+                .nbrp()
+                .bits(nominal_prescaler - 1)
+        });
 
-            self.0.internals.can.tscc.write(|w| {
-                w.tss()
-                    .bits(config.timestamp.select.into())
-                    // Prescaler is 1 + tcp value.
-                    .tcp()
-                    .bits(config.timestamp.prescaler - 1)
-            });
+        // Safety: Every bit pattern of TCP is valid.
+        self.0.internals.can.tscc.write(|w| unsafe {
+            w.tss()
+                .variant(config.timestamp.select)
+                // Prescaler is 1 + tcp value.
+                .tcp()
+                .bits(config.timestamp.prescaler - 1)
+        });
 
-            match config.fd_mode {
-                FdFeatures::ClassicOnly => self
-                    .0
+        match config.fd_mode {
+            FdFeatures::ClassicOnly => self
+                .0
+                .internals
+                .can
+                .cccr
+                .modify(|_, w| w.fdoe().clear_bit()),
+            FdFeatures::Fd {
+                allow_bit_rate_switching,
+                data_phase_timing,
+            } => {
+                self.0
                     .internals
                     .can
                     .cccr
-                    .modify(|_, w| w.fdoe().clear_bit()),
-                FdFeatures::Fd {
-                    allow_bit_rate_switching,
-                    data_phase_timing,
-                } => {
-                    self.0
-                        .internals
-                        .can
-                        .cccr
-                        .modify(|_, w| w.fdoe().set_bit().brse().bit(allow_bit_rate_switching));
-                    let data_divider = data_phase_timing.prescaler(
-                        self.0.internals.dependencies.can_clock(),
-                        &DATA_BIT_TIMING_RANGES,
-                    )?;
-                    self.0.internals.can.dbtp.write(|w| {
-                        w.dsjw()
-                            .bits(data_phase_timing.sjw)
-                            .dtseg1()
-                            .bits(data_phase_timing.phase_seg_1)
-                            .dtseg2()
-                            .bits(data_phase_timing.phase_seg_2)
-                            .dbrp()
-                            .bits((data_divider - 1) as u8)
-                    });
-                }
-            };
+                    .modify(|_, w| w.fdoe().set_bit().brse().bit(allow_bit_rate_switching));
+                let data_divider = data_phase_timing.prescaler(
+                    self.0.internals.dependencies.can_clock(),
+                    &DATA_BIT_TIMING_RANGES,
+                )?;
+                // Safety: The configuration is checked to be valid when computing the prescaler
+                self.0.internals.can.dbtp.write(|w| unsafe {
+                    w.dsjw()
+                        .bits(data_phase_timing.sjw)
+                        .dtseg1()
+                        .bits(data_phase_timing.phase_seg_1)
+                        .dtseg2()
+                        .bits(data_phase_timing.phase_seg_2)
+                        .dbrp()
+                        .bits((data_divider - 1) as u8)
+                });
+            }
+        };
 
-            // Global filter options
-            self.0.internals.can.gfc.write(|w| {
-                w.anfs()
-                    .bits(config.nm_std.into())
-                    .anfe()
-                    .bits(config.nm_ext.into())
-            });
+        // Global filter options
+        self.0.internals.can.gfc.write(|w| {
+            w.anfs()
+                .variant(config.nm_std.into())
+                .anfe()
+                .variant(config.nm_ext.into())
+        });
 
-            // Configure test/loopback mode
-            self.set_test(config.test);
-        }
+        // Configure test/loopback mode
+        self.set_test(config.test);
 
         Ok(())
     }

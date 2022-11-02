@@ -1,5 +1,6 @@
 //! CAN bus configuration
 
+use crate::reg::gfc::{ANFE_A, ANFS_A};
 pub use crate::reg::{self, tscc::TSS_A as TimeStampSelect};
 use core::ops::RangeInclusive;
 use fugit::HertzU32;
@@ -151,12 +152,22 @@ pub enum NonMatchingAction {
     Reject,
 }
 
-impl From<NonMatchingAction> for u8 {
+impl From<NonMatchingAction> for ANFS_A {
     fn from(val: NonMatchingAction) -> Self {
         match val {
-            NonMatchingAction::Fifo0 => 0,
-            NonMatchingAction::Fifo1 => 1,
-            NonMatchingAction::Reject => 2,
+            NonMatchingAction::Fifo0 => ANFS_A::RXF0,
+            NonMatchingAction::Fifo1 => ANFS_A::RXF1,
+            NonMatchingAction::Reject => ANFS_A::REJECT,
+        }
+    }
+}
+
+impl From<NonMatchingAction> for ANFE_A {
+    fn from(val: NonMatchingAction) -> Self {
+        match val {
+            NonMatchingAction::Fifo0 => ANFE_A::RXF0,
+            NonMatchingAction::Fifo1 => ANFE_A::RXF1,
+            NonMatchingAction::Reject => ANFE_A::REJECT,
         }
     }
 }
