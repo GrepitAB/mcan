@@ -232,10 +232,7 @@ impl From<Filter> for FilterStandardId {
                 id,
                 msg_type,
                 offset,
-            } => {
-                (id.as_raw() as u32) << 16 | (msg_type as u32) << 9 | offset as u32 | (0x7 << 27)
-                // NOTE: ignored since FEC=STRXBUF
-            }
+            } => (id.as_raw() as u32) << 16 | (msg_type as u32) << 9 | offset as u32 | (0x7 << 27),
         };
 
         FilterStandardId(v)

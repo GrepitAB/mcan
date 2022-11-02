@@ -61,7 +61,7 @@ where
         self.regs().s.read().ffl().bits() as usize
     }
 
-    /// Returns if the queue is empty
+    /// Returns `true` if the queue is empty
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
