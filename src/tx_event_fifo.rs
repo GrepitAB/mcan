@@ -44,7 +44,7 @@ impl<'a, P: crate::CanId> TxEventFifo<'a, P> {
         self.txefs().read().effl().bits() as usize
     }
 
-    /// Returns if the queue is empty
+    /// Returns `true` if the queue is empty
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
