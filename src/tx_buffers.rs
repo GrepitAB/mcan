@@ -1,5 +1,6 @@
 use crate::reg;
 use crate::{bus, messageram::Capacities};
+use core::convert::Infallible;
 use core::marker::PhantomData;
 use generic_array::{typenum::Unsigned, GenericArray};
 use vcell::VolatileCell;
@@ -144,52 +145,56 @@ impl<'a, P: crate::CanId, C: Capacities> Tx<'a, P, C> {
     }
 
     /// Allow [`Interrupt::TransmissionCancellationFinished`] to be triggered by
-    /// `buffers`. Interrupts for other buffers remain unchanged.
+    /// `to_be_enabled`. Interrupts for other buffers remain unchanged.
     ///
     /// Note that the peripheral-level interrupt also needs to be enabled for
     /// interrupts to reach the system interrupt controller.
     ///
     /// [`Interrupt::TransmissionCancellationFinished`]: crate::interrupt::Interrupt::TransmissionCancellationFinished
-    pub fn enable_cancellation_interrupt(&mut self, buffers: TxBufferSet) {
+    pub fn enable_cancellation_interrupt(&mut self, to_be_enabled: TxBufferSet) {
         // Safety: There are no reserved bit patterns.
         unsafe {
-            self.txbcie().modify(|r, w| w.bits(r.bits() | buffers.0));
+            self.txbcie()
+                .modify(|r, w| w.bits(r.bits() | to_be_enabled.0));
         }
     }
 
     /// Disallow [`Interrupt::TransmissionCancellationFinished`] to be triggered
-    /// by `buffers`. Interrupts for other buffers remain unchanged.
+    /// by `to_be_disabled`. Interrupts for other buffers remain unchanged.
     ///
     /// [`Interrupt::TransmissionCancellationFinished`]: crate::interrupt::Interrupt::TransmissionCancellationFinished
-    pub fn disable_cancellation_interrupt(&mut self, buffers: TxBufferSet) {
+    pub fn disable_cancellation_interrupt(&mut self, to_be_disabled: TxBufferSet) {
         // Safety: There are no reserved bit patterns.
         unsafe {
-            self.txbcie().modify(|r, w| w.bits(r.bits() & !buffers.0));
+            self.txbcie()
+                .modify(|r, w| w.bits(r.bits() & !to_be_disabled.0));
         }
     }
 
-    /// Allow [`Interrupt::TransmissionCompleted`] to be triggered by `buffers`.
-    /// Interrupts for other buffers remain unchanged.
+    /// Allow [`Interrupt::TransmissionCompleted`] to be triggered by
+    /// `to_be_enabled`. Interrupts for other buffers remain unchanged.
     ///
     /// Note that the peripheral-level interrupt also needs to be enabled for
     /// interrupts to reach the system interrupt controller.
     ///
     /// [`Interrupt::TransmissionCompleted`]: crate::interrupt::Interrupt::TransmissionCompleted
-    pub fn enable_transmission_completed_interrupt(&mut self, buffers: TxBufferSet) {
+    pub fn enable_transmission_completed_interrupt(&mut self, to_be_enabled: TxBufferSet) {
         // Safety: There are no reserved bit patterns.
         unsafe {
-            self.txbtie().modify(|r, w| w.bits(r.bits() | buffers.0));
+            self.txbtie()
+                .modify(|r, w| w.bits(r.bits() | to_be_enabled.0));
         }
     }
 
     /// Disallow [`Interrupt::TransmissionCompleted`] to be triggered by
-    /// `buffers`. Interrupts for other buffers remain unchanged.
+    /// `to_be_disabled`. Interrupts for other buffers remain unchanged.
     ///
     /// [`Interrupt::TransmissionCompleted`]: crate::interrupt::Interrupt::TransmissionCompleted
-    pub fn disable_transmission_completed_interrupt(&mut self, buffers: TxBufferSet) {
+    pub fn disable_transmission_completed_interrupt(&mut self, to_be_disabled: TxBufferSet) {
         // Safety: There are no reserved bit patterns.
         unsafe {
-            self.txbtie().modify(|r, w| w.bits(r.bits() & !buffers.0));
+            self.txbtie()
+                .modify(|r, w| w.bits(r.bits() & !to_be_disabled.0));
         }
     }
 
@@ -221,24 +226,34 @@ impl<'a, P: crate::CanId, C: Capacities> Tx<'a, P, C> {
         self.get_transmission_completed_flags().iter()
     }
 
-    /// Request cancellation of `buffers`. This function does not wait for
-    /// cancellation to finish. Successful cancellation is indicated by a
-    /// combination of the transmission completed and cancellation flags. If
-    /// the flags indicate that transmission is completed, then the request
-    /// arrived too late to stop the transmission, which was completed
-    /// successfully. If the cancellation flag is set, but not the
-    /// transmission completed flag, the transmission was either not started or
-    /// was aborted due to an error.
-    pub fn cancel_multi(&mut self, buffers: TxBufferSet) {
-        // Safety: There are no reserved bit patterns.
-        unsafe {
-            self.txbcr().write(|w| w.bits(buffers.0));
+    fn poll_canceled(&self, to_be_canceled: TxBufferSet) -> nb::Result<(), Infallible> {
+        let already_canceled = self.get_cancellation_flags();
+        if already_canceled.0 & to_be_canceled.0 == to_be_canceled.0 {
+            Ok(())
+        } else {
+            Err(nb::Error::WouldBlock)
         }
     }
 
-    /// Request cancellation of a transmit buffer. This function does not wait
-    /// for cancellation to finish. See [`Self::cancel_multi`].
-    pub fn cancel(&mut self, index: usize) {
+    /// Request cancellation of `to_be_canceled`. Returns
+    /// [`nb::Error::WouldBlock`] until the cancellation is finished. If a
+    /// buffer that has started transmission is canceled, it may still finish
+    /// successfully, in which case the corresponding
+    /// [`Self::get_transmission_completed_flags`] will be set. If the
+    /// cancellation flag is set, but not the transmission completed flag, the
+    /// transmission was either not started or was aborted due to an error.
+    pub fn cancel_multi(&mut self, to_be_canceled: TxBufferSet) -> nb::Result<(), Infallible> {
+        self.poll_canceled(to_be_canceled).or_else(|_| {
+            // Safety: There are no reserved bit patterns.
+            unsafe {
+                self.txbcr().write(|w| w.bits(to_be_canceled.0));
+            }
+            self.poll_canceled(to_be_canceled)
+        })
+    }
+
+    /// Request cancellation of a transmit buffer. See [`Self::cancel_multi`].
+    pub fn cancel(&mut self, index: usize) -> nb::Result<(), Infallible> {
         self.cancel_multi([index].into_iter().collect())
     }
 }
