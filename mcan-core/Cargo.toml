@@ -2,8 +2,13 @@
 name = "mcan-core"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Unofficial MCAN Hardware Abstraction Layer (integration layer)"
+keywords = ["no-std", "can"]
+categories = ["embedded", "hardware-support", "no-std"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/GrepitAB/mcan"
+documentation = "https://docs.rs/crate/mcan-core/"
+readme = "../README.md"
 
 [dependencies]
 fugit = "0.3"
