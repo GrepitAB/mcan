@@ -1,4 +1,5 @@
 use crate::reg;
+use reg::AccessRegisterBlock as _;
 use bitfield::bitfield;
 use core::marker::PhantomData;
 
@@ -353,7 +354,7 @@ pub struct OwnedInterruptSet<P>(InterruptSet, PhantomData<P>);
 #[derive(Debug)]
 pub struct MaskError(pub InterruptSet);
 
-impl<Id: crate::CanId> OwnedInterruptSet<Id> {
+impl<Id: mcan_core::CanId> OwnedInterruptSet<Id> {
     /// Assumes exclusive ownership of `interrupts`.
     ///
     /// # Safety
@@ -402,7 +403,7 @@ impl<Id: crate::CanId> OwnedInterruptSet<Id> {
     /// IR. The bits not owned by this set must not be affected by these writes
     /// and must not be relied on by these reads.
     unsafe fn ir(&self) -> &reg::IR {
-        &(*Id::ADDRESS).ir
+        &(*Id::register_block()).ir
     }
 
     /// Get the subset of interrupts in this set that are currently flagged.
@@ -431,7 +432,7 @@ pub struct InterruptConfiguration<P> {
     _peripheral: PhantomData<P>,
 }
 
-impl<Id: crate::CanId> InterruptConfiguration<Id> {
+impl<Id: mcan_core::CanId> InterruptConfiguration<Id> {
     /// # Safety
     /// This type takes ownership of some of the registers from the peripheral
     /// RegisterBlock. Do not use them to avoid aliasing. Do not instantiate
@@ -454,17 +455,17 @@ impl<Id: crate::CanId> InterruptConfiguration<Id> {
 
     fn ils(&self) -> &reg::ILS {
         // Safety: The constructor sets self up to have exclusive access to ILS.
-        &unsafe { &*Id::ADDRESS }.ils
+        &unsafe { &*Id::register_block() }.ils
     }
 
     fn ile(&self) -> &reg::ILE {
         // Safety: The constructor sets self up to have exclusive access to ILE.
-        &unsafe { &*Id::ADDRESS }.ile
+        &unsafe { &*Id::register_block() }.ile
     }
 
     fn ie(&self) -> &reg::IE {
         // Safety: The constructor sets self up to have exclusive access to IE.
-        &unsafe { &*Id::ADDRESS }.ie
+        &unsafe { &*Id::register_block() }.ie
     }
 
     /// Request to enable the set of `interrupts` on the chosen interrupt line.

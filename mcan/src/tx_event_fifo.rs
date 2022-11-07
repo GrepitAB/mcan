@@ -1,5 +1,6 @@
 use crate::message::TxEvent;
 use crate::reg;
+use reg::AccessRegisterBlock as _;
 use core::marker::PhantomData;
 use vcell::VolatileCell;
 
@@ -9,7 +10,7 @@ pub struct TxEventFifo<'a, P> {
     _markers: PhantomData<P>,
 }
 
-impl<'a, P: crate::CanId> TxEventFifo<'a, P> {
+impl<'a, P: mcan_core::CanId> TxEventFifo<'a, P> {
     /// # Safety
     /// The caller must be the owner or the peripheral referenced by `P`. The
     /// constructed type assumes ownership of some of the registers from the
@@ -26,7 +27,7 @@ impl<'a, P: crate::CanId> TxEventFifo<'a, P> {
 
     /// Raw access to the registers.
     unsafe fn regs(&self) -> &reg::RegisterBlock {
-        &(*P::ADDRESS)
+        &(*P::register_block())
     }
 
     fn txefs(&self) -> &reg::TXEFS {
