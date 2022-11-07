@@ -1,7 +1,7 @@
 use crate::reg;
-use reg::AccessRegisterBlock as _;
 use bitfield::bitfield;
 use core::marker::PhantomData;
+use reg::AccessRegisterBlock as _;
 
 /// CAN interrupt lines
 /// The CAN peripheral provides two interrupt lines to the system interrupt

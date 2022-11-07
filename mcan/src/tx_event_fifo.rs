@@ -1,7 +1,7 @@
 use crate::message::TxEvent;
 use crate::reg;
-use reg::AccessRegisterBlock as _;
 use core::marker::PhantomData;
+use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
 
 /// Transmit event queue on peripheral `P`

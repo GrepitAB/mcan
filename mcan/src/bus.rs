@@ -394,7 +394,9 @@ impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Can<'_
     }
 }
 
-impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> CanBus for Can<'_, Id, D, C> {
+impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> CanBus
+    for Can<'_, Id, D, C>
+{
     fn error_counters(&self) -> ErrorCounters {
         self.internals.can.ecr.read().into()
     }

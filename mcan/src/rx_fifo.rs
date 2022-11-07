@@ -1,8 +1,8 @@
 use crate::message::rx;
 use crate::reg;
-use reg::AccessRegisterBlock as _;
 use core::convert::Infallible;
 use core::marker::PhantomData;
+use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
 
 /// Receive FIFO `F` on peripheral `P`.

@@ -1,9 +1,9 @@
 use crate::reg;
-use reg::AccessRegisterBlock as _;
 use crate::{bus, messageram::Capacities};
 use core::convert::Infallible;
 use core::marker::PhantomData;
 use generic_array::{typenum::Unsigned, GenericArray};
+use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
 
 /// Transmit queue and dedicated buffers
