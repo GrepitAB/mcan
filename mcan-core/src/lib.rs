@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 //! `mcan-core` provides a set of essential abstractions that serve as a thin
 //! integration layer between platform independent [`mcan`] crate and platform
 //! specific HAL crates (in documentation also referred to as _target HALs_).
@@ -10,13 +12,16 @@
 //! prerequisites.
 //!
 //! [`mcan`]: <https://docs.rs/crate/mcan/>
-use fugit::HertzU32 as Hz;
+
+pub use fugit;
 
 /// Trait representing CAN peripheral identity
 ///
-/// Type implementing this trait is expected to be used as a marker type that
+/// Types implementing this trait is expected to be used as a marker type that
 /// serves the purpose of identifying specific instance of CAN peripheral
-/// available on the platform (as there might be more than one).
+/// available on the platform (as there might be more than one). It only conveys
+/// *where* the CAN peripheral HW register is located, not necessarily that it
+/// can be accessed. The latter is expressed by the [`Dependencies`] trait.
 ///
 /// It is also useful for associating [`Dependencies`] with specific [`CanId`]
 /// and setting up additional type constraints preventing application developers
@@ -25,7 +30,8 @@ use fugit::HertzU32 as Hz;
 /// More details in [`Dependencies`] documentation.
 ///
 /// # Safety
-/// `CanId::ADDRESS` points to a valid HW register
+/// `CanId::ADDRESS` points to the start of a valid HW register of a CAN
+/// peripheral
 ///
 /// # Examples
 /// ```no_run
@@ -50,12 +56,12 @@ pub unsafe trait CanId {
 
 /// Trait representing CAN peripheral dependencies
 ///
-/// Struct implementing [`Dependencies`] should be
+/// Structs implementing [`Dependencies`] should
 /// - enclose all object representable dependencies of [`CanId`] and release
 ///   them upon destruction
-/// - constructible only when it is safe and sound to interact with CAN
+/// - be constructible only when it is safe and sound to interact with CAN
 ///   peripheral (respective clocks and pins have been already configured)
-/// - a singleton (only a single instance of [`Dependencies`] for a specific
+/// - be a singleton (only a single instance of [`Dependencies`] for a specific
 ///   [`CanId`] must exist at the same time)
 ///
 /// in order to prevent aliasing and guarantee that high level abstractions
@@ -257,11 +263,11 @@ pub unsafe trait Dependencies<Id: CanId> {
     ///
     /// MCAN uses CPU clock for most of its internal operations and its speed
     /// has to be equal or faster to CAN specific asynchronous clock.
-    fn host_clock(&self) -> Hz;
+    fn host_clock(&self) -> fugit::HertzU32;
     /// Frequency of CAN specific asynchronous clock.
     ///
     /// MCAN uses separate asynchronous clock for signaling / sampling and as
     /// such it should have reasonably high precision. Its speed has to be equal
     /// of slower to host clock.
-    fn can_clock(&self) -> Hz;
+    fn can_clock(&self) -> fugit::HertzU32;
 }
