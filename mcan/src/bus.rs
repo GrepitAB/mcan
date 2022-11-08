@@ -91,6 +91,7 @@ impl From<BitTimingError> for ConfigurationError {
 }
 
 /// Index is out of bounds
+#[derive(Debug)]
 pub struct OutOfBounds;
 
 /// Common CANbus functionality

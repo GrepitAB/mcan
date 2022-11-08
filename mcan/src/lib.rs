@@ -8,11 +8,14 @@ pub mod filter;
 pub mod interrupt;
 pub mod message;
 pub mod messageram;
+pub mod prelude;
 pub mod reg;
 pub mod rx_dedicated_buffers;
 pub mod rx_fifo;
 pub mod tx_buffers;
 pub mod tx_event_fifo;
+
+pub use embedded_can;
 
 // For svd2rust generated code that refers to everything via `crate::...`
 use reg::generic::*;

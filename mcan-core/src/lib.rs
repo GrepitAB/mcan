@@ -1,3 +1,4 @@
+#![no_std]
 #![warn(missing_docs)]
 
 //! `mcan-core` provides a set of essential abstractions that serves as a thin
