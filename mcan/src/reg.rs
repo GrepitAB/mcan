@@ -2,11 +2,19 @@
 
 pub mod generic;
 
-// TODO: Documentation
-/// # Safety
-/// `CanId::Address` points to valid `crate::reg::RegisterBlock`
-pub unsafe trait CanId {
-    const ADDRESS: *const RegisterBlock;
+/// Blanket implementation trait that provides convenience method for recasting
+/// the pointer type to specific [`RegisterBlock`] type.
+///
+/// This is necessary, as [`mcan_core::CanId`] and [`mcan_core`] itself does not
+/// know the concrete low-level access type definition.
+pub trait AccessRegisterBlock {
+    fn register_block() -> *const RegisterBlock;
+}
+
+impl<T: mcan_core::CanId> AccessRegisterBlock for T {
+    fn register_block() -> *const RegisterBlock {
+        T::ADDRESS as *const _
+    }
 }
 
 pub struct Can<Id>(core::marker::PhantomData<(*const (), Id)>);
@@ -22,11 +30,11 @@ impl<Id> Can<Id> {
     }
 }
 
-impl<Id: CanId> core::ops::Deref for Can<Id> {
+impl<Id: mcan_core::CanId> core::ops::Deref for Can<Id> {
     type Target = RegisterBlock;
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        unsafe { &*Id::ADDRESS }
+        unsafe { &*Id::register_block() }
     }
 }
 

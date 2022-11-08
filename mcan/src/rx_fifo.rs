@@ -2,6 +2,7 @@ use crate::message::rx;
 use crate::reg;
 use core::convert::Infallible;
 use core::marker::PhantomData;
+use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
 
 /// Receive FIFO `F` on peripheral `P`.
@@ -21,18 +22,19 @@ pub trait GetRxFifoRegs {
     /// Direct access can break assumptions made by the abstraction.
     unsafe fn registers(&self) -> &reg::RxFifoRegs;
 }
-impl<'a, P: crate::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'a, Fifo0, P, M> {
+
+impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'a, Fifo0, P, M> {
     unsafe fn registers(&self) -> &reg::RxFifoRegs {
-        &(*P::ADDRESS).rxf0
+        &(*P::register_block()).rxf0
     }
 }
-impl<'a, P: crate::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'a, Fifo1, P, M> {
+impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'a, Fifo1, P, M> {
     unsafe fn registers(&self) -> &reg::RxFifoRegs {
-        &(*P::ADDRESS).rxf1
+        &(*P::register_block()).rxf1
     }
 }
 
-impl<'a, F, P: crate::CanId, M: rx::AnyMessage> RxFifo<'a, F, P, M>
+impl<'a, F, P: mcan_core::CanId, M: rx::AnyMessage> RxFifo<'a, F, P, M>
 where
     Self: GetRxFifoRegs,
 {

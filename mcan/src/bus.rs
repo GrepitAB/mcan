@@ -137,7 +137,7 @@ pub struct CanConfigurable<'a, Id, D, C: Capacities>(
     Can<'a, Id, D, C>,
 );
 
-impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
+impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
     CanConfigurable<'a, Id, D, C>
 {
     /// Raw access to the registers.
@@ -367,7 +367,7 @@ impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
     }
 }
 
-impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
+impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
     /// Raw access to the registers.
     ///
     /// # Safety
@@ -394,7 +394,9 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'_, Id, D,
     }
 }
 
-impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can<'_, Id, D, C> {
+impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> CanBus
+    for Can<'_, Id, D, C>
+{
     fn error_counters(&self) -> ErrorCounters {
         self.internals.can.ecr.read().into()
     }
@@ -408,14 +410,14 @@ impl<Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> CanBus for Can
     }
 }
 
-impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities> Can<'a, Id, D, C> {
+impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Can<'a, Id, D, C> {
     pub fn configure(mut self) -> CanConfigurable<'a, Id, D, C> {
         self.enable_configuration_change();
         CanConfigurable(self)
     }
 }
 
-impl<'a, Id: crate::CanId, D: crate::Dependencies<Id>, C: Capacities>
+impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
     CanConfigurable<'a, Id, D, C>
 {
     /// Create new can peripheral.

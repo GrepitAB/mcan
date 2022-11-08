@@ -3,6 +3,7 @@ use crate::message::rx;
 use crate::reg;
 use core::convert::Infallible;
 use core::marker::PhantomData;
+use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
 
 /// Dedicated receive buffers on peripheral `P`
@@ -11,7 +12,7 @@ pub struct RxDedicatedBuffer<'a, P, M: rx::AnyMessage> {
     _markers: PhantomData<P>,
 }
 
-impl<'a, P: crate::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
+impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
     /// # Safety
     /// The caller must be the owner or the peripheral referenced by `P`. The
     /// constructed type assumes ownership of some of the registers from the
@@ -28,7 +29,7 @@ impl<'a, P: crate::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
 
     /// Raw access to the registers.
     unsafe fn regs(&self) -> &reg::RegisterBlock {
-        &(*P::ADDRESS)
+        &(*P::register_block())
     }
 
     fn ndat1(&self) -> &reg::NDAT1 {

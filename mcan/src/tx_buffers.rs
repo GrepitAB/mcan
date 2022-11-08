@@ -3,6 +3,7 @@ use crate::{bus, messageram::Capacities};
 use core::convert::Infallible;
 use core::marker::PhantomData;
 use generic_array::{typenum::Unsigned, GenericArray};
+use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
 
 /// Transmit queue and dedicated buffers
@@ -11,7 +12,7 @@ pub struct Tx<'a, P, C: Capacities> {
     _markers: PhantomData<P>,
 }
 
-impl<'a, P: crate::CanId, C: Capacities> Tx<'a, P, C> {
+impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
     /// # Safety
     /// The caller must be the owner or the peripheral referenced by `P`. The
     /// constructed type assumes ownership of some of the registers from the
@@ -36,7 +37,7 @@ impl<'a, P: crate::CanId, C: Capacities> Tx<'a, P, C> {
 
     /// Raw access to the registers.
     unsafe fn regs(&self) -> &reg::RegisterBlock {
-        &(*P::ADDRESS)
+        &(*P::register_block())
     }
 
     fn txfqs(&self) -> &reg::TXFQS {
