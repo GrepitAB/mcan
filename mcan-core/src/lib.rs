@@ -1,8 +1,9 @@
 #![warn(missing_docs)]
 
-//! `mcan-core` provides a set of essential abstractions that serve as a thin
-//! integration layer between platform independent [`mcan`] crate and platform
-//! specific HAL crates (in documentation also referred to as _target HALs_).
+//! `mcan-core` provides a set of essential abstractions that serves as a thin
+//! integration layer between the platform independent [`mcan`] crate and
+//! platform specific HAL crates (in documentation also referred to as _target
+//! HALs_).
 //!
 //! Traits from this crate are not supposed to be implemented by the
 //! application developer; implementations should be provided by target HALs.
@@ -17,15 +18,15 @@ pub use fugit;
 
 /// Trait representing CAN peripheral identity
 ///
-/// Types implementing this trait is expected to be used as a marker type that
-/// serves the purpose of identifying specific instance of CAN peripheral
+/// Types implementing this trait are expected to be used as a marker types that
+/// serve the purpose of identifying specific instances of CAN peripherals
 /// available on the platform (as there might be more than one). It only conveys
 /// *where* the CAN peripheral HW register is located, not necessarily that it
 /// can be accessed. The latter is expressed by the [`Dependencies`] trait.
 ///
 /// It is also useful for associating [`Dependencies`] with specific [`CanId`]
 /// and setting up additional type constraints preventing application developers
-/// from constructing a CAN abstraction with incompatible set of dependencies.
+/// from constructing CAN abstractions with incompatible sets of dependencies.
 ///
 /// More details in [`Dependencies`] documentation.
 ///
@@ -59,7 +60,7 @@ pub unsafe trait CanId {
 /// Structs implementing [`Dependencies`] should
 /// - enclose all object representable dependencies of [`CanId`] and release
 ///   them upon destruction
-/// - be constructible only when it is safe and sound to interact with CAN
+/// - be constructible only when it is safe and sound to interact with the CAN
 ///   peripheral (respective clocks and pins have been already configured)
 /// - be a singleton (only a single instance of [`Dependencies`] for a specific
 ///   [`CanId`] must exist at the same time)
@@ -67,16 +68,16 @@ pub unsafe trait CanId {
 /// in order to prevent aliasing and guarantee that high level abstractions
 /// provided by [`mcan`] are sole owners of the peripheral.
 ///
-/// Depending on a target HAL API capabilities this can assured either in
-/// compile-time by type constraints or by fallible [`Dependencies`] struct
+/// Depending on target HAL API capabilities this can be assured either at
+/// compile-time by type constraints and/or by fallible [`Dependencies`] struct
 /// construction.
 ///
 /// # Safety
-/// While [`Dependencies`] type instance exists
+/// While the [`Dependencies`] type instance exists
 /// - CAN related clocks must not change
 /// - CAN related pins modes must not change
-/// - HW register must not be safely accessible by application developer and
-///   accessed in other parts of the target HAL
+/// - The HW register must be neither safely accessible by the application
+///   developer nor accessed in other parts of the target HAL
 ///
 /// # Example
 /// ```no_run
@@ -136,12 +137,12 @@ pub unsafe trait CanId {
 /// // addressing is somewhat duplicated between `pac::CAN{0, 1}`
 /// // and `Can{0, 1}`.
 /// //
-/// // HAL design from this example assumes that a marker/identity type is
-/// // reused in related contexts allowing for elaborate type constraints
+/// // The HAL design in this example assumes that a marker/identity type
+/// // is reused in related contexts allowing for elaborate type constraints
 /// // between abstractions from different modules (like peripheral clock
 /// // for CAN and its HW register).
 /// //
-/// // In more classical setup, `CanId` could be just implemented by low
+/// // In a simpler setup, `CanId` could be just implemented by the low
 /// // level CAN type from PAC.
 /// unsafe impl CanId for hal::identities::Can0 {
 ///     const ADDRESS: *const () = 0xDEAD0000 as *const _;
@@ -156,18 +157,18 @@ pub unsafe trait CanId {
 ///     // users à la reference counting. `HostClock` should not be
 ///     // reconfigurable while having `> 0` users.
 ///     host_clock_token: HostClockToken,
-///     // Clock object representing CAN specific asynchronous clock
+///     // Clock object representing the CAN specific asynchronous clock
 ///     can_peripheral_clock: PeripheralClock<ID>,
 ///     // Opaque field reserved for RX pin
 ///     rx: RX,
 ///     // Opaque field reserved for TX pin
 ///     tx: TX,
-///     // Opaque field reserved for CAN HW register type (from PAC)
+///     // Opaque field reserved for the CAN HW register type (from PAC)
 ///     can: CAN,
 /// }
 ///
 /// impl<ID: PeripheralClockId, RX, TX, CAN> Dependencies<ID, RX, TX, CAN> {
-///     // Constructor that additionally register a new user of host clock
+///     // Constructor that additionally registers a new user of the host clock
 ///     pub fn new<S>(
 ///         host_clock: &mut HostClock,
 ///         can_peripheral_clock: PeripheralClock<ID>,
@@ -217,9 +218,9 @@ pub unsafe trait CanId {
 ///     }
 /// }
 ///
-/// // Trait introduced in order to get 1:1 mapping from identity type to PAC type.
+/// // Trait introduced in order to get 1:1 mapping from the identity type to the PAC type.
 /// //
-/// // Again, in more classical setup, `CanId` could be just implemented by low
+/// // Again, in a simpler setup, `CanId` could just be implemented by the low
 /// // level CAN type from PAC.
 /// trait OwnedPeripheral {
 ///     type Represents: CanId;
@@ -257,17 +258,19 @@ pub unsafe trait CanId {
 ///     type ValidFor = hal::identities::Can1;
 /// }
 /// ```
+///
 /// [`mcan`]: <https://docs.rs/crate/mcan/>
 pub unsafe trait Dependencies<Id: CanId> {
     /// Frequency of the host / main / CPU clock.
     ///
-    /// MCAN uses CPU clock for most of its internal operations and its speed
-    /// has to be equal or faster to CAN specific asynchronous clock.
+    /// MCAN uses the host clock for most of its internal operations and its
+    /// speed has to be equal to or faster than the CAN specific asynchronous
+    /// clock.
     fn host_clock(&self) -> fugit::HertzU32;
-    /// Frequency of CAN specific asynchronous clock.
+    /// Frequency of the CAN specific asynchronous clock.
     ///
-    /// MCAN uses separate asynchronous clock for signaling / sampling and as
-    /// such it should have reasonably high precision. Its speed has to be equal
-    /// of slower to host clock.
+    /// MCAN uses a separate asynchronous clock for signaling / sampling and
+    /// as such it should have reasonably high precision. Its speed has to
+    /// be equal to or slower than the host clock.
     fn can_clock(&self) -> fugit::HertzU32;
 }
