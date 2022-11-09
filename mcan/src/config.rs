@@ -1,6 +1,5 @@
 //! CAN bus configuration
 
-use crate::reg::gfc::{ANFE_A, ANFS_A};
 pub use crate::reg::{self, tscc::TSS_A as TimeStampSelect};
 use core::ops::RangeInclusive;
 use fugit::HertzU32;
@@ -9,18 +8,26 @@ use fugit::HertzU32;
 #[derive(Copy, Clone)]
 pub struct CanConfig {
     /// Run peripheral in CAN-FD mode
-    pub fd_mode: FdFeatures,
+    pub mode: Mode,
     /// Modes of testing
-    pub test: TestMode,
+    pub loopback: bool,
     /// Bit timing parameters for everything except the data phase of bit rate
     /// switched FD frames.
     pub nominal_timing: BitTiming,
     /// Timestamp configuration
     pub timestamp: Timestamp,
-    /// Action when handling non-matching standard frame
-    pub nm_std: NonMatchingAction,
-    /// Action when handling non-matching extended frame
-    pub nm_ext: NonMatchingAction,
+    /// RX Fifo 0
+    pub rx_fifo_0: RxFifoConfig,
+    /// RX Fifo 1
+    pub rx_fifo_1: RxFifoConfig,
+    /// Tx configuration
+    pub tx: TxConfig,
+}
+
+#[derive(Default, Copy, Clone)]
+pub struct TxConfig {
+    pub tx_event_fifo_watermark: u8,
+    pub tx_buffer_mode: TxBufferMode,
 }
 
 /// Bit-timing parameters. The bit time is determined by
@@ -41,6 +48,18 @@ pub struct BitTiming {
     /// determined by `phase_seg_1` and `phase_seg_2` is a whole number of time
     /// quanta.
     pub bitrate: HertzU32,
+}
+
+impl BitTiming {
+    fn new(bitrate: HertzU32) -> Self {
+        Self {
+            // Note: SWJ and {N,D}TSEG{1,2} defaults come from reset values
+            sjw: 0x4,
+            phase_seg_1: 0xB,
+            phase_seg_2: 0x4,
+            bitrate,
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -82,25 +101,25 @@ pub(crate) struct BitTimingRanges {
     prescaler: RangeInclusive<u32>,
 }
 pub(crate) const NOMINAL_BIT_TIMING_RANGES: BitTimingRanges = BitTimingRanges {
-    sjw: 0..=127,
-    phase_seg_1: 1..=255,
-    phase_seg_2: 1..=127,
-    time_quanta_per_bit: 4..=385,
-    prescaler: 0..=511,
+    sjw: 1..=128,
+    phase_seg_1: 2..=256,
+    phase_seg_2: 2..=128,
+    time_quanta_per_bit: 5..=385,
+    prescaler: 1..=512,
 };
 pub(crate) const DATA_BIT_TIMING_RANGES: BitTimingRanges = BitTimingRanges {
-    sjw: 0..=15,
-    phase_seg_1: 0..=31,
-    phase_seg_2: 0..=15,
-    time_quanta_per_bit: 4..=49,
-    prescaler: 0..=31,
+    sjw: 1..=16,
+    phase_seg_1: 1..=32,
+    phase_seg_2: 1..=16,
+    time_quanta_per_bit: 3..=49,
+    prescaler: 1..=32,
 };
 
 impl BitTiming {
     /// Returns the number of time quanta that make up one bit time, `t_bit /
     /// t_q`
     pub fn time_quanta_per_bit(&self) -> u32 {
-        1 + (u32::from(self.phase_seg_1) + 1) + (u32::from(self.phase_seg_2) + 1)
+        1 + u32::from(self.phase_seg_1) + u32::from(self.phase_seg_2)
     }
 
     fn check(&self, valid: &BitTimingRanges) -> Result<(), BitTimingError> {
@@ -141,49 +160,12 @@ impl BitTiming {
     }
 }
 
-/// What to do with non-matching frames
-#[derive(Copy, Clone)]
-pub enum NonMatchingAction {
-    /// Put frame in FIFO 0
-    Fifo0,
-    /// Put frame in FIFO 1
-    Fifo1,
-    /// Reject frame
-    Reject,
-}
-
-impl From<NonMatchingAction> for ANFS_A {
-    fn from(val: NonMatchingAction) -> Self {
-        match val {
-            NonMatchingAction::Fifo0 => ANFS_A::RXF0,
-            NonMatchingAction::Fifo1 => ANFS_A::RXF1,
-            NonMatchingAction::Reject => ANFS_A::REJECT,
-        }
-    }
-}
-
-impl From<NonMatchingAction> for ANFE_A {
-    fn from(val: NonMatchingAction) -> Self {
-        match val {
-            NonMatchingAction::Fifo0 => ANFE_A::RXF0,
-            NonMatchingAction::Fifo1 => ANFE_A::RXF1,
-            NonMatchingAction::Reject => ANFE_A::REJECT,
-        }
-    }
-}
-
-impl Default for NonMatchingAction {
-    fn default() -> Self {
-        Self::Reject
-    }
-}
-
 /// Enable/disable CAN-FD and related features
 #[derive(Copy, Clone)]
-pub enum FdFeatures {
+pub enum Mode {
     /// Classic mode with 8-bytes data. Reception of an FD frame is considered
     /// an error.
-    ClassicOnly,
+    Classic,
     /// Transmission and reception of CAN FD frames (with up to 64 bytes of
     /// data) is enabled. This does not prevent use of classic CAN frames.
     Fd {
@@ -195,11 +177,85 @@ pub enum FdFeatures {
     },
 }
 
-/// Test modes for the bus
+impl Default for Mode {
+    fn default() -> Self {
+        Self::Classic
+    }
+}
+
+impl CanConfig {
+    pub(crate) fn new(bitrate: HertzU32) -> Self {
+        Self {
+            mode: Default::default(),
+            loopback: Default::default(),
+            nominal_timing: BitTiming::new(bitrate),
+            timestamp: Default::default(),
+            rx_fifo_0: Default::default(),
+            rx_fifo_1: Default::default(),
+            tx: Default::default(),
+        }
+    }
+}
+
+/// Denotes a RX-fifo configuration
+#[derive(Default, Copy, Clone)]
+pub struct RxFifoConfig {
+    /// FIFO mode
+    pub mode: RxFifoMode,
+    /// Fifo fullnes to generate interrupt
+    pub watermark: u8,
+}
+
+/// Operating modes for the two FIFO
 #[derive(Copy, Clone)]
-pub enum TestMode {
-    /// Do not initialize a test
-    Disabled,
-    /// Setup loopback
-    Loopback,
+pub enum RxFifoMode {
+    /// Blocking mode
+    /// When the RX FIFO is full, not messages are written until at least one
+    /// has been read out
+    Blocking,
+    /// Overwriting mode
+    /// When the RX FIFO is full, the oldest messsage will be deleted and a new
+    /// message will take its place
+    Overwrite,
+}
+
+impl Default for RxFifoMode {
+    fn default() -> Self {
+        Self::Blocking
+    }
+}
+
+impl From<RxFifoMode> for bool {
+    fn from(val: RxFifoMode) -> Self {
+        match val {
+            RxFifoMode::Overwrite => true,
+            RxFifoMode::Blocking => false,
+        }
+    }
+}
+
+/// How to treat the transmit buffer
+#[derive(Copy, Clone)]
+pub enum TxBufferMode {
+    /// Act as a FIFO
+    /// Messages are sent according to the get index
+    Fifo,
+    /// Act as a queue
+    /// Messages are sent with priority according to lowest ID
+    Queue,
+}
+
+impl Default for TxBufferMode {
+    fn default() -> Self {
+        Self::Fifo
+    }
+}
+
+impl From<TxBufferMode> for bool {
+    fn from(val: TxBufferMode) -> Self {
+        match val {
+            TxBufferMode::Queue => true,
+            TxBufferMode::Fifo => false,
+        }
+    }
 }
