@@ -6,7 +6,7 @@ use super::*;
 /// configured to use. Only for the transmit message format.
 pub trait AnyMessage: super::AnyMessage {
     /// Constructs the message described by `m`
-    fn new(m: MessageBuilder) -> Result<Self, Error>;
+    fn new(m: MessageBuilder) -> Result<Self, TooMuchData>;
 }
 
 impl<const N: usize> super::AnyMessage for Message<N>
@@ -50,7 +50,7 @@ impl<const N: usize> AnyMessage for Message<N>
 where
     Message<N>: super::AnyMessage,
 {
-    fn new(m: MessageBuilder) -> Result<Self, Error> {
+    fn new(m: MessageBuilder) -> Result<Self, TooMuchData> {
         m.build()
     }
 }
@@ -105,7 +105,7 @@ pub struct MessageBuilder<'a> {
 
 impl<'a> MessageBuilder<'a> {
     /// Create the message in the format required by the peripheral.
-    pub fn build<const N: usize>(self) -> Result<Message<N>, Error> {
+    pub fn build<const N: usize>(self) -> Result<Message<N>, TooMuchData> {
         let mut data = [0; N];
 
         let id_field = match self.id {
@@ -123,7 +123,7 @@ impl<'a> MessageBuilder<'a> {
         let len = match self.frame_contents {
             FrameContents::Data(d) => {
                 if d.len() > N {
-                    return Err(Error::TooMuchData);
+                    return Err(TooMuchData);
                 }
                 data[..d.len()].copy_from_slice(d);
                 d.len()
