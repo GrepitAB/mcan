@@ -207,11 +207,11 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         // Safety: The configuration is checked to be valid when computing the prescaler
         reg.nbtp.write(|w| unsafe {
             w.nsjw()
-                .bits(config.nominal_timing.sjw)
+                .bits(config.nominal_timing.sjw - 1)
                 .ntseg1()
-                .bits(config.nominal_timing.phase_seg_1)
+                .bits(config.nominal_timing.phase_seg_1 - 1)
                 .ntseg2()
-                .bits(config.nominal_timing.phase_seg_2)
+                .bits(config.nominal_timing.phase_seg_2 - 1)
                 .nbrp()
                 .bits(nominal_prescaler - 1)
         });
@@ -233,18 +233,18 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             } => {
                 reg.cccr
                     .modify(|_, w| w.fdoe().set_bit().brse().bit(allow_bit_rate_switching));
-                let data_divider = data_phase_timing
+                let data_prescaler = data_phase_timing
                     .prescaler(dependencies.can_clock(), &DATA_BIT_TIMING_RANGES)?;
                 // Safety: The configuration is checked to be valid when computing the prescaler
                 reg.dbtp.write(|w| unsafe {
                     w.dsjw()
-                        .bits(data_phase_timing.sjw)
+                        .bits(data_phase_timing.sjw - 1)
                         .dtseg1()
-                        .bits(data_phase_timing.phase_seg_1)
+                        .bits(data_phase_timing.phase_seg_1 - 1)
                         .dtseg2()
-                        .bits(data_phase_timing.phase_seg_2)
+                        .bits(data_phase_timing.phase_seg_2 - 1)
                         .dbrp()
-                        .bits((data_divider - 1) as u8)
+                        .bits((data_prescaler - 1) as u8)
                 });
             }
         };
@@ -264,28 +264,43 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         reg.test.modify(|_, w| w.lbck().bit(config.loopback));
 
         // Configure RX FIFO 0
-        reg.rxf0.c.modify(|_, w| unsafe {
-            w.fom()
-                .bit(config.rx_fifo_0.mode.into())
-                .fwm()
-                .bits(config.rx_fifo_0.watermark)
+        reg.rxf0.c.modify(|_, w| {
+            let w = w.fom().bit(config.rx_fifo_0.mode.into());
+            let mut watermark = config.rx_fifo_0.watermark;
+            // According to the spec, any value >= 64 is interpreted as watermark disabled
+            if watermark >= 64 {
+                watermark = 64;
+            }
+            // Safety: The value is sanitized before the write
+            unsafe { w.fwm().bits(watermark) }
         });
 
         // Configure RX FIFO 1
-        reg.rxf1.c.modify(|_, w| unsafe {
-            w.fom()
-                .bit(config.rx_fifo_1.mode.into())
-                .fwm()
-                .bits(config.rx_fifo_1.watermark)
+        reg.rxf1.c.modify(|_, w| {
+            let w = w.fom().bit(config.rx_fifo_1.mode.into());
+            let mut watermark = config.rx_fifo_1.watermark;
+            // According to the spec, any value >= 64 is interpreted as watermark disabled
+            if watermark >= 64 {
+                watermark = 64;
+            }
+            // Safety: The value is sanitized before the write
+            unsafe { w.fwm().bits(watermark) }
         });
 
         // Configure Tx Buffer
         reg.txbc
-            .modify(|_, w| w.tfqm().bit(config.tx.tx_buffer_mode.into()));
+            .modify(|_, w| w.tfqm().bit(config.tx.tx_queue_submode.into()));
 
         // Configure Tx Event Fifo
-        reg.txefc
-            .modify(|_, w| unsafe { w.efwm().bits(config.tx.tx_event_fifo_watermark) });
+        reg.txefc.modify(|_, w| {
+            let mut watermark = config.tx.tx_event_fifo_watermark;
+            // According to the spec, any value >= 32 is interpreted as watermark disabled
+            if watermark >= 32 {
+                watermark = 32;
+            }
+            // Safety: The value is sanitized before the write
+            unsafe { w.efwm().bits(watermark) }
+        });
         Ok(())
     }
 
@@ -296,76 +311,99 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
     /// memory RAM is largely unchecked and an improperly configured linker
     /// script could interfere with bus operations.
     fn apply_ram_config(reg: &crate::reg::Can<Id>, mem: &SharedMemoryInner<C>) {
-        // TODO: Narrow down the unsafe usage?
-        // TODO: Maybe move the HW calls into respective CAN subfields construction
-        unsafe {
-            // Standard id
-            reg.sidfc.write(|w| {
-                w.flssa()
-                    .bits(&mem.filters_standard as *const _ as u16)
-                    .lss()
-                    .bits(mem.filters_standard.len() as u8)
-            });
+        // Standard id
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Length is checked at compile-time on the `Capacities` constraints level
+        reg.sidfc.write(|w| unsafe {
+            w.flssa()
+                .bits(&mem.filters_standard as *const _ as u16)
+                .lss()
+                .bits(mem.filters_standard.len() as u8)
+        });
 
-            // Extended id
-            reg.xidfc.write(|w| {
-                w.flesa()
-                    .bits(&mem.filters_extended as *const _ as u16)
-                    .lse()
-                    .bits(mem.filters_extended.len() as u8)
-            });
+        // Extended id
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Length is checked at compile-time on the `Capacities` constraints level
+        reg.xidfc.write(|w| unsafe {
+            w.flesa()
+                .bits(&mem.filters_extended as *const _ as u16)
+                .lse()
+                .bits(mem.filters_extended.len() as u8)
+        });
 
-            // RX buffers
-            reg.rxbc
-                .write(|w| w.rbsa().bits(&mem.rx_dedicated_buffers as *const _ as u16));
+        // RX buffers
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        reg.rxbc
+            .write(|w| unsafe { w.rbsa().bits(&mem.rx_dedicated_buffers as *const _ as u16) });
 
-            // Data field size for buffers and FIFOs
-            reg.rxesc.write(|w| {
-                w.rbds()
-                    .bits(C::RxBufferMessage::REG)
-                    .f0ds()
-                    .bits(C::RxFifo0Message::REG)
-                    .f1ds()
-                    .bits(C::RxFifo1Message::REG)
-            });
+        // Data field size for buffers and FIFOs
+        reg.rxesc.write(|w| {
+            w.rbds()
+                .bits(C::RxBufferMessage::REG)
+                .f0ds()
+                .bits(C::RxFifo0Message::REG)
+                .f1ds()
+                .bits(C::RxFifo1Message::REG)
+        });
 
-            //// RX FIFO 0
-            reg.rxf0.c.write(|w| {
-                w.fs()
-                    .bits(mem.rx_fifo_0.len() as u8)
-                    .fsa()
-                    .bits(&mem.rx_fifo_0 as *const _ as u16)
-            });
+        // RX FIFO 0
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Length is checked at compile-time on the `Capacities` constraints level
+        reg.rxf0.c.write(|w| unsafe {
+            w.fsa()
+                .bits(&mem.rx_fifo_0 as *const _ as u16)
+                .fs()
+                .bits(mem.rx_fifo_0.len() as u8)
+        });
 
-            //// RX FIFO 1
-            reg.rxf1.c.write(|w| {
-                w.fs()
-                    .bits(mem.rx_fifo_1.len() as u8)
-                    .fsa()
-                    .bits(&mem.rx_fifo_1 as *const _ as u16)
-            });
+        // RX FIFO 1
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Length is checked at compile-time on the `Capacities` constraints level
+        reg.rxf1.c.write(|w| unsafe {
+            w.fsa()
+                .bits(&mem.rx_fifo_1 as *const _ as u16)
+                .fs()
+                .bits(mem.rx_fifo_1.len() as u8)
+        });
 
-            // TX buffers
-            reg.txbc.write(|w| {
-                w.tfqs()
-                    .bits(<C::TxBuffers as Unsigned>::U8 - <C::DedicatedTxBuffers as Unsigned>::U8)
-                    .ndtb()
-                    .bits(<C::DedicatedTxBuffers as Unsigned>::U8)
-                    .tbsa()
-                    .bits(&mem.tx_buffers as *const _ as u16)
-            });
+        // TX buffers
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Lengths are checked at compile-time on the `Capacities` constraints level
+        reg.txbc.write(|w| unsafe {
+            w.tfqs()
+                .bits(<C::TxBuffers as Unsigned>::U8 - <C::DedicatedTxBuffers as Unsigned>::U8)
+                .ndtb()
+                .bits(<C::DedicatedTxBuffers as Unsigned>::U8)
+                .tbsa()
+                .bits(&mem.tx_buffers as *const _ as u16)
+        });
 
-            // TX element size config
-            reg.txesc.write(|w| w.tbds().bits(C::TxMessage::REG));
+        // TX element size config
+        reg.txesc.write(|w| w.tbds().bits(C::TxMessage::REG));
 
-            // TX events
-            reg.txefc.write(|w| {
-                w.efs()
-                    .bits(mem.tx_event_fifo.len() as u8)
-                    .efsa()
-                    .bits(&mem.tx_event_fifo as *const _ as u16)
-            });
-        }
+        // TX events
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Lengths are checked at compile-time on the `Capacities` constraints level
+        reg.txefc.write(|w| unsafe {
+            w.efsa()
+                .bits(&mem.tx_event_fifo as *const _ as u16)
+                .efs()
+                .bits(mem.tx_event_fifo.len() as u8)
+        });
     }
 
     /// Create new can peripheral.
@@ -385,6 +423,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         // Since `dependencies` field implies ownership of the HW register pointed to by
         // `Id: CanId`, `can` has a unique access to it
         let reg = unsafe { crate::reg::Can::<Id>::new() };
+
         reg.configuration_mode();
 
         if !memory.is_addressable() {
@@ -392,7 +431,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         }
 
         let memory = memory.init();
-        Self::apply_ram_config(&reg, &memory);
+        Self::apply_ram_config(&reg, memory);
 
         let can = CanConfigurable(Can {
             // Safety: Since `Can::new` takes a PAC singleton, it can only be called once. Then no

@@ -24,17 +24,37 @@ pub struct CanConfig {
     pub tx: TxConfig,
 }
 
+/// Denotes a TX related configuration
 #[derive(Default, Copy, Clone)]
 pub struct TxConfig {
+    /// Denotes TX Event queue fullness required to trigger a corresponding
+    /// interrupt
+    ///
+    /// Any value greater than 32 is interpreted as 32; 0 means that interrupt
+    /// is disabled
     pub tx_event_fifo_watermark: u8,
-    pub tx_buffer_mode: TxBufferMode,
+    /// TX queue submode
+    pub tx_queue_submode: TxQueueSubmode,
 }
 
-/// Bit-timing parameters. The bit time is determined by
+/// Bit-timing parameters
+///
+/// The bit time is determined by
 /// - the time quantum `t_q`, which is a fraction of the peripheral clock
 /// - the number of time quanta in a bit time, determined by `phase_seg_1` and
 ///   `phase_seg_2`
 /// The configurable ranges of the parameters depend on which timing is changed.
+///
+/// This struct expects *real* values, extra subtractions and additions expected
+/// the HW register are handled within the MCAN HAL.
+///
+/// Default values are:
+/// - swj: 0x4
+/// - phase_seg_1: 0xB
+/// - phase_seg_1: 0x4
+///
+/// Default time quanta in a bit time is 16 (phase_seg_1 + phase_seg_2 +
+/// synchronization segment (1))
 #[derive(Copy, Clone)]
 pub struct BitTiming {
     /// Synchronization jump width
@@ -161,10 +181,11 @@ impl BitTiming {
 }
 
 /// Enable/disable CAN-FD and related features
-#[derive(Copy, Clone)]
+#[derive(Default, Copy, Clone)]
 pub enum Mode {
     /// Classic mode with 8-bytes data. Reception of an FD frame is considered
     /// an error.
+    #[default]
     Classic,
     /// Transmission and reception of CAN FD frames (with up to 64 bytes of
     /// data) is enabled. This does not prevent use of classic CAN frames.
@@ -175,12 +196,6 @@ pub enum Mode {
         /// frames.
         data_phase_timing: BitTiming,
     },
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Self::Classic
-    }
 }
 
 impl CanConfig {
@@ -197,32 +212,34 @@ impl CanConfig {
     }
 }
 
-/// Denotes a RX-fifo configuration
+/// Denotes a RX FIFO configuration
 #[derive(Default, Copy, Clone)]
 pub struct RxFifoConfig {
     /// FIFO mode
     pub mode: RxFifoMode,
-    /// Fifo fullnes to generate interrupt
+    /// Denotes queue fullness required to trigger a corresponding interrupt
+    ///
+    /// Any value greater than 64 is interpreted as 64; 0 means that interrupt
+    /// is disabled
     pub watermark: u8,
 }
 
 /// Operating modes for the two FIFO
-#[derive(Copy, Clone)]
+#[derive(Default, Copy, Clone)]
 pub enum RxFifoMode {
     /// Blocking mode
+    ///
     /// When the RX FIFO is full, not messages are written until at least one
     /// has been read out
+    #[default]
     Blocking,
+    // TODO: Risk of data corruption, no synchronization primitives for this mode between the core
+    // and MCAN; consider using unsafe for construction of this mode variant
     /// Overwriting mode
+    ///
     /// When the RX FIFO is full, the oldest messsage will be deleted and a new
     /// message will take its place
     Overwrite,
-}
-
-impl Default for RxFifoMode {
-    fn default() -> Self {
-        Self::Blocking
-    }
 }
 
 impl From<RxFifoMode> for bool {
@@ -234,28 +251,25 @@ impl From<RxFifoMode> for bool {
     }
 }
 
+// TODO: Improve documentation, consider better custom naming convention that
+// reflects these modes better
 /// How to treat the transmit buffer
-#[derive(Copy, Clone)]
-pub enum TxBufferMode {
+#[derive(Default, Copy, Clone)]
+pub enum TxQueueSubmode {
     /// Act as a FIFO
     /// Messages are sent according to the get index
-    Fifo,
+    #[default]
+    Queue,
     /// Act as a queue
     /// Messages are sent with priority according to lowest ID
-    Queue,
+    Priority,
 }
 
-impl Default for TxBufferMode {
-    fn default() -> Self {
-        Self::Fifo
-    }
-}
-
-impl From<TxBufferMode> for bool {
-    fn from(val: TxBufferMode) -> Self {
+impl From<TxQueueSubmode> for bool {
+    fn from(val: TxQueueSubmode) -> Self {
         match val {
-            TxBufferMode::Queue => true,
-            TxBufferMode::Fifo => false,
+            TxQueueSubmode::Priority => true,
+            TxQueueSubmode::Queue => false,
         }
     }
 }
