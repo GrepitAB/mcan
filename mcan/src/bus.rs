@@ -133,7 +133,6 @@ pub struct Internals<'a, Id, D> {
 }
 
 impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Internals<'a, Id, D> {
-    // TODO: Maybe it should be unsafe?
     /// Switches between "Software Initialization" mode and "Normal Operation".
     /// In Software Initialization, messages are not received or transmitted.
     /// Configuration cannot be changed. In Normal Operation, messages can
@@ -141,6 +140,19 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Internals<'a, Id,
     pub fn set_init(&mut self, init: bool) {
         self.reg.cccr.modify(|_, w| w.init().bit(init));
         while self.reg.cccr.read().init().bit() != init {}
+    }
+
+    /// Re-enters "Normal Operation" if in "Software Initialization" mode.
+    /// In Software Initialization, messages are not received or transmitted.
+    /// Configuration cannot be changed. In Normal Operation, messages can
+    /// be transmitted and received.
+    pub fn enter_operational_mode(&mut self) {
+        self.set_init(false);
+    }
+
+    /// Returns `true` if the peripheral is in "Normal Operation" mode.
+    pub fn is_operational(&self) -> bool {
+        self.reg.cccr.read().init().bit_is_clear()
     }
 
     fn enable_cce(&mut self) {
@@ -184,12 +196,13 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         &mut self.0.interrupts
     }
 
+    /// Allows reconfiguring config
     pub fn config(&mut self) -> &mut CanConfig {
         &mut self.0.internals.config
     }
 
     /// Apply parameters from a bus config struct
-    fn apply_bus_config(&mut self) -> Result<(), ConfigurationError> {
+    fn apply_configuration(&mut self) -> Result<(), ConfigurationError> {
         let reg = &self.0.internals.reg;
         let config = &self.0.internals.config;
         let dependencies = &self.0.internals.dependencies;
@@ -420,11 +433,11 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
 
     /// Locks the configuration and enters normal operation.
     pub fn finalize(mut self) -> Result<Can<'a, Id, D, C>, ConfigurationError> {
-        self.apply_bus_config()?;
+        self.apply_configuration()?;
 
         let mut can = self.0;
         // Enter normal operation (CCE is set to 0 automatically)
-        can.internals.set_init(false);
+        can.internals.enter_operational_mode();
 
         Ok(can)
     }
