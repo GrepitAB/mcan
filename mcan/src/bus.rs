@@ -124,9 +124,8 @@ pub struct Can<'a, Id, D, C: Capacities> {
 
 /// Implementation details.
 pub struct Internals<'a, Id, D> {
-    // TODO: Maybe it should be "reg" or sth, "can" feels very ambiguous
     /// CAN bus peripheral
-    can: crate::reg::Can<Id>,
+    reg: crate::reg::Can<Id>,
     dependencies: D,
     config: CanConfig,
     filters_standard: FiltersStandard<'a, Id>,
@@ -140,13 +139,13 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Internals<'a, Id,
     /// Configuration cannot be changed. In Normal Operation, messages can
     /// be transmitted and received.
     pub fn set_init(&mut self, init: bool) {
-        self.can.cccr.modify(|_, w| w.init().bit(init));
-        while self.can.cccr.read().init().bit() != init {}
+        self.reg.cccr.modify(|_, w| w.init().bit(init));
+        while self.reg.cccr.read().init().bit() != init {}
     }
 
     fn enable_cce(&mut self) {
-        self.can.cccr.modify(|_, w| w.cce().set_bit());
-        while !self.can.cccr.read().cce().bit() {}
+        self.reg.cccr.modify(|_, w| w.cce().set_bit());
+        while !self.reg.cccr.read().cce().bit() {}
     }
 }
 
@@ -191,7 +190,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
 
     /// Apply parameters from a bus config struct
     fn apply_bus_config(&mut self) -> Result<(), ConfigurationError> {
-        let can = &self.0.internals.can;
+        let reg = &self.0.internals.reg;
         let config = &self.0.internals.config;
         let dependencies = &self.0.internals.dependencies;
         if !(1..=16).contains(&config.timestamp.prescaler) {
@@ -203,7 +202,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             .prescaler(dependencies.can_clock(), &NOMINAL_BIT_TIMING_RANGES)?;
 
         // Safety: The configuration is checked to be valid when computing the prescaler
-        can.nbtp.write(|w| unsafe {
+        reg.nbtp.write(|w| unsafe {
             w.nsjw()
                 .bits(config.nominal_timing.sjw)
                 .ntseg1()
@@ -215,7 +214,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         });
 
         // Safety: Every bit pattern of TCP is valid.
-        can.tscc.write(|w| unsafe {
+        reg.tscc.write(|w| unsafe {
             w.tss()
                 .variant(config.timestamp.select)
                 // Prescaler is 1 + tcp value.
@@ -224,17 +223,17 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         });
 
         match config.mode {
-            Mode::Classic => can.cccr.modify(|_, w| w.fdoe().clear_bit()),
+            Mode::Classic => reg.cccr.modify(|_, w| w.fdoe().clear_bit()),
             Mode::Fd {
                 allow_bit_rate_switching,
                 data_phase_timing,
             } => {
-                can.cccr
+                reg.cccr
                     .modify(|_, w| w.fdoe().set_bit().brse().bit(allow_bit_rate_switching));
                 let data_divider = data_phase_timing
                     .prescaler(dependencies.can_clock(), &DATA_BIT_TIMING_RANGES)?;
                 // Safety: The configuration is checked to be valid when computing the prescaler
-                can.dbtp.write(|w| unsafe {
+                reg.dbtp.write(|w| unsafe {
                     w.dsjw()
                         .bits(data_phase_timing.sjw)
                         .dtseg1()
@@ -250,7 +249,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         // Global filter configuration
         // This setting is redundant and the same behaviour is achievable through main
         // filter API
-        can.gfc.write(|w| {
+        reg.gfc.write(|w| {
             w.anfs()
                 .variant(crate::reg::gfc::ANFS_A::REJECT)
                 .anfe()
@@ -258,11 +257,11 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         });
 
         // Configure test/loopback mode
-        can.cccr.modify(|_, w| w.test().bit(config.loopback));
-        can.test.modify(|_, w| w.lbck().bit(config.loopback));
+        reg.cccr.modify(|_, w| w.test().bit(config.loopback));
+        reg.test.modify(|_, w| w.lbck().bit(config.loopback));
 
         // Configure RX FIFO 0
-        can.rxf0.c.modify(|_, w| unsafe {
+        reg.rxf0.c.modify(|_, w| unsafe {
             w.fom()
                 .bit(config.rx_fifo_0.mode.into())
                 .fwm()
@@ -270,7 +269,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         });
 
         // Configure RX FIFO 1
-        can.rxf1.c.modify(|_, w| unsafe {
+        reg.rxf1.c.modify(|_, w| unsafe {
             w.fom()
                 .bit(config.rx_fifo_1.mode.into())
                 .fwm()
@@ -278,11 +277,11 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         });
 
         // Configure Tx Buffer
-        can.txbc
+        reg.txbc
             .modify(|_, w| w.tfqm().bit(config.tx.tx_buffer_mode.into()));
 
         // Configure Tx Event Fifo
-        can.txefc
+        reg.txefc
             .modify(|_, w| unsafe { w.efwm().bits(config.tx.tx_event_fifo_watermark) });
         Ok(())
     }
@@ -293,12 +292,12 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
     /// only safeguard keeping the bus operational. Apart from that, the
     /// memory RAM is largely unchecked and an improperly configured linker
     /// script could interfere with bus operations.
-    fn apply_ram_config(can: &crate::reg::Can<Id>, mem: &SharedMemoryInner<C>) {
+    fn apply_ram_config(reg: &crate::reg::Can<Id>, mem: &SharedMemoryInner<C>) {
         // TODO: Narrow down the unsafe usage?
         // TODO: Maybe move the HW calls into respective CAN subfields construction
         unsafe {
             // Standard id
-            can.sidfc.write(|w| {
+            reg.sidfc.write(|w| {
                 w.flssa()
                     .bits(&mem.filters_standard as *const _ as u16)
                     .lss()
@@ -306,7 +305,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             });
 
             // Extended id
-            can.xidfc.write(|w| {
+            reg.xidfc.write(|w| {
                 w.flesa()
                     .bits(&mem.filters_extended as *const _ as u16)
                     .lse()
@@ -314,11 +313,11 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             });
 
             // RX buffers
-            can.rxbc
+            reg.rxbc
                 .write(|w| w.rbsa().bits(&mem.rx_dedicated_buffers as *const _ as u16));
 
             // Data field size for buffers and FIFOs
-            can.rxesc.write(|w| {
+            reg.rxesc.write(|w| {
                 w.rbds()
                     .bits(C::RxBufferMessage::REG)
                     .f0ds()
@@ -328,7 +327,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             });
 
             //// RX FIFO 0
-            can.rxf0.c.write(|w| {
+            reg.rxf0.c.write(|w| {
                 w.fs()
                     .bits(mem.rx_fifo_0.len() as u8)
                     .fsa()
@@ -336,7 +335,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             });
 
             //// RX FIFO 1
-            can.rxf1.c.write(|w| {
+            reg.rxf1.c.write(|w| {
                 w.fs()
                     .bits(mem.rx_fifo_1.len() as u8)
                     .fsa()
@@ -344,7 +343,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             });
 
             // TX buffers
-            can.txbc.write(|w| {
+            reg.txbc.write(|w| {
                 w.tfqs()
                     .bits(<C::TxBuffers as Unsigned>::U8 - <C::DedicatedTxBuffers as Unsigned>::U8)
                     .ndtb()
@@ -354,10 +353,10 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             });
 
             // TX element size config
-            can.txesc.write(|w| w.tbds().bits(C::TxMessage::REG));
+            reg.txesc.write(|w| w.tbds().bits(C::TxMessage::REG));
 
             // TX events
-            can.txefc.write(|w| {
+            reg.txefc.write(|w| {
                 w.efs()
                     .bits(mem.tx_event_fifo.len() as u8)
                     .efsa()
@@ -382,14 +381,14 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         // Safety:
         // Since `dependencies` field implies ownership of the HW register pointed to by
         // `Id: CanId`, `can` has a unique access to it
-        let can = unsafe { crate::reg::Can::<Id>::new() };
+        let reg = unsafe { crate::reg::Can::<Id>::new() };
 
         if !memory.is_addressable() {
             return Err(MemoryNotAddressableError);
         }
 
         let memory = memory.init();
-        Self::apply_ram_config(&can, &memory);
+        Self::apply_ram_config(&reg, &memory);
 
         let can = Can {
             // Safety: Since `Can::new` takes a PAC singleton, it can only be called once. Then no
@@ -405,7 +404,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             tx: unsafe { Tx::new(&mut memory.tx_buffers) },
             tx_event_fifo: unsafe { TxEventFifo::new(&mut memory.tx_event_fifo) },
             internals: Internals {
-                can,
+                reg,
                 dependencies,
                 config: CanConfig::new(bitrate),
                 // Safety: The memory is zeroed by `memory.init`, so all filters are initially
@@ -436,10 +435,9 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Ca
     ///
     /// # Safety
     /// The abstraction assumes that it has exclusive ownership of the
-    /// registers. Direct access can break such assumptions. Direct access
-    /// can break assumptions
+    /// registers. Direct access can break such assumptions.
     pub unsafe fn registers(&self) -> &crate::reg::Can<Id> {
-        &self.internals.can
+        &self.internals.reg
     }
 
     pub fn configure(mut self) -> CanConfigurable<'a, Id, D, C> {
@@ -453,14 +451,14 @@ impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> CanBus
     for Can<'_, Id, D, C>
 {
     fn error_counters(&self) -> ErrorCounters {
-        self.internals.can.ecr.read().into()
+        self.internals.reg.ecr.read().into()
     }
 
     fn protocol_status(&self) -> ProtocolStatus {
-        self.internals.can.psr.read().into()
+        self.internals.reg.psr.read().into()
     }
 
     fn ts_count(&self) -> u16 {
-        self.internals.can.tscv.read().tsc().bits()
+        self.internals.reg.tscv.read().tsc().bits()
     }
 }
