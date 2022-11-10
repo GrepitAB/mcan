@@ -133,31 +133,21 @@ pub struct Internals<'a, Id, D> {
 }
 
 impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Internals<'a, Id, D> {
-    /// Switches between "Software Initialization" mode and "Normal Operation".
-    /// In Software Initialization, messages are not received or transmitted.
-    /// Configuration cannot be changed. In Normal Operation, messages can
-    /// be transmitted and received.
-    pub fn set_init(&mut self, init: bool) {
-        self.reg.cccr.modify(|_, w| w.init().bit(init));
-        while self.reg.cccr.read().init().bit() != init {}
+    fn configuration_mode(&self) {
+        self.reg.configuration_mode()
     }
 
     /// Re-enters "Normal Operation" if in "Software Initialization" mode.
     /// In Software Initialization, messages are not received or transmitted.
     /// Configuration cannot be changed. In Normal Operation, messages can
     /// be transmitted and received.
-    pub fn enter_operational_mode(&mut self) {
-        self.set_init(false);
+    pub fn operational_mode(&self) {
+        self.reg.operational_mode();
     }
 
     /// Returns `true` if the peripheral is in "Normal Operation" mode.
     pub fn is_operational(&self) -> bool {
-        self.reg.cccr.read().init().bit_is_clear()
-    }
-
-    fn enable_cce(&mut self) {
-        self.reg.cccr.modify(|_, w| w.cce().set_bit());
-        while !self.reg.cccr.read().cce().bit() {}
+        self.reg.is_operational()
     }
 }
 
@@ -395,6 +385,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         // Since `dependencies` field implies ownership of the HW register pointed to by
         // `Id: CanId`, `can` has a unique access to it
         let reg = unsafe { crate::reg::Can::<Id>::new() };
+        reg.configuration_mode();
 
         if !memory.is_addressable() {
             return Err(MemoryNotAddressableError);
@@ -403,7 +394,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         let memory = memory.init();
         Self::apply_ram_config(&reg, &memory);
 
-        let can = Can {
+        let can = CanConfigurable(Can {
             // Safety: Since `Can::new` takes a PAC singleton, it can only be called once. Then no
             // duplicates will be constructed. The registers that are delegated to these components
             // should not be touched by any other code. This has to be upheld by all code that has
@@ -425,8 +416,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
                 filters_standard: unsafe { FiltersStandard::new(&mut memory.filters_standard) },
                 filters_extended: unsafe { FiltersExtended::new(&mut memory.filters_extended) },
             },
-        }
-        .configure();
+        });
 
         Ok(can)
     }
@@ -435,9 +425,10 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
     pub fn finalize(mut self) -> Result<Can<'a, Id, D, C>, ConfigurationError> {
         self.apply_configuration()?;
 
-        let mut can = self.0;
+        let can = self.0;
+
         // Enter normal operation (CCE is set to 0 automatically)
-        can.internals.enter_operational_mode();
+        can.internals.operational_mode();
 
         Ok(can)
     }
@@ -453,9 +444,8 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Ca
         &self.internals.reg
     }
 
-    pub fn configure(mut self) -> CanConfigurable<'a, Id, D, C> {
-        self.internals.set_init(true);
-        self.internals.enable_cce();
+    pub fn configure(self) -> CanConfigurable<'a, Id, D, C> {
+        self.internals.configuration_mode();
         CanConfigurable(self)
     }
 }

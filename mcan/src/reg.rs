@@ -1,5 +1,4 @@
 #![allow(non_camel_case_types)]
-
 pub mod generic;
 
 /// Blanket implementation trait that provides convenience method for recasting
@@ -27,6 +26,31 @@ impl<Id> Can<Id> {
     /// aliasing of `RegisterBlock`
     pub unsafe fn new() -> Self {
         Self(core::marker::PhantomData)
+    }
+}
+
+impl<Id: mcan_core::CanId> Can<Id> {
+    fn set_init(&self, value: bool) {
+        self.cccr.modify(|_, w| w.init().bit(value));
+        while self.cccr.read().init().bit() != value {}
+    }
+
+    fn enable_cce(&self) {
+        self.cccr.modify(|_, w| w.cce().set_bit());
+        while !self.cccr.read().cce().bit() {}
+    }
+
+    pub(crate) fn configuration_mode(&self) {
+        self.set_init(true);
+        self.enable_cce();
+    }
+
+    pub(crate) fn operational_mode(&self) {
+        self.set_init(false);
+    }
+
+    pub(crate) fn is_operational(&self) -> bool {
+        self.cccr.read().init().bit_is_clear()
     }
 }
 
