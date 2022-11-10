@@ -33,12 +33,9 @@ impl_any_message!(32, 5);
 impl_any_message!(48, 6);
 impl_any_message!(64, 7);
 
-/// Errors for message methods
+/// Data does not fit in the backing buffer
 #[derive(Debug)]
-pub enum Error {
-    /// Data does not fit in the backing buffer
-    TooMuchData,
-}
+pub struct TooMuchData;
 
 /// CAN frame/message.
 pub enum Message<const N: usize> {
@@ -194,7 +191,7 @@ impl<const N: usize> Raw for RawMessage<N> {
 }
 
 /// Finds the smallest data length code that encodes at least len bytes
-fn len_to_dlc(len: usize, fd_format: bool) -> Result<u8, Error> {
+fn len_to_dlc(len: usize, fd_format: bool) -> Result<u8, TooMuchData> {
     if fd_format {
         match len as u8 {
             0..=8 => Ok(len as u8),
@@ -205,12 +202,12 @@ fn len_to_dlc(len: usize, fd_format: bool) -> Result<u8, Error> {
             25..=32 => Ok(13),
             33..=48 => Ok(14),
             49..=64 => Ok(15),
-            65.. => Err(Error::TooMuchData),
+            65.. => Err(TooMuchData),
         }
     } else {
         match len as u8 {
             0..=8 => Ok(len as u8),
-            9.. => Err(Error::TooMuchData),
+            9.. => Err(TooMuchData),
         }
     }
 }
