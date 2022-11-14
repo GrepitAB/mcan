@@ -34,7 +34,7 @@ pub struct TxConfig {
     /// is disabled
     pub tx_event_fifo_watermark: u8,
     /// TX queue submode
-    pub tx_queue_submode: TxQueueSubmode,
+    pub tx_queue_submode: TxQueueMode,
 }
 
 /// Bit-timing parameters
@@ -224,52 +224,88 @@ pub struct RxFifoConfig {
     pub watermark: u8,
 }
 
-/// Operating modes for the two FIFO
+/// Mode of operation for the RX FIFO
 #[derive(Default, Copy, Clone)]
-pub enum RxFifoMode {
+pub struct RxFifoMode(RxFifoModeVariant);
+
+impl RxFifoMode {
     /// Blocking mode
     ///
-    /// When the RX FIFO is full, not messages are written until at least one
-    /// has been read out
-    #[default]
-    Blocking,
-    // TODO: Risk of data corruption, no synchronization primitives for this mode between the core
-    // and MCAN; consider using unsafe for construction of this mode variant
+    /// When the RX FIFO is full, incoming messages are dropped until at least
+    /// one message has been read out from the FIFO.
+    pub fn blocking() -> Self {
+        Self(RxFifoModeVariant::Blocking)
+    }
     /// Overwriting mode
     ///
     /// When the RX FIFO is full, the oldest messsage will be deleted and a new
-    /// message will take its place
+    /// message will take its place.
+    ///
+    /// # Safety
+    /// For the RX FIFO running in this mode, MCAN *does NOT provide* any
+    /// synchronization primitives that user can rely on in order to guarantee
+    /// integrity of the data being received.
+    ///
+    /// General guideline from the datasheet suggests that user should never
+    /// read the oldest element in queue (as there is a risk that the message is
+    /// currently being overwritten) and index should be offsetted by 1 or
+    /// more (counting from the oldest message) depending on the speed of the
+    /// CPU.
+    ///
+    /// Thus, it is up to the application developer to provide such an
+    /// index offset so read out messages are correct.
+    pub unsafe fn overwrite() -> Self {
+        Self(RxFifoModeVariant::Overwrite)
+    }
+}
+
+/// Mode of operation for the RX FIFO (inner enum)
+#[derive(Default, Copy, Clone)]
+pub enum RxFifoModeVariant {
+    /// Blocking mode
+    ///
+    /// More details at [`RxFifoMode::blocking`]
+    #[default]
+    Blocking,
+    /// Overwriting mode
+    ///
+    /// More details at [`RxFifoMode::overwrite`]
     Overwrite,
 }
 
 impl From<RxFifoMode> for bool {
     fn from(val: RxFifoMode) -> Self {
-        match val {
-            RxFifoMode::Overwrite => true,
-            RxFifoMode::Blocking => false,
+        match val.0 {
+            RxFifoModeVariant::Overwrite => true,
+            RxFifoModeVariant::Blocking => false,
         }
     }
 }
 
-// TODO: Improve documentation, consider better custom naming convention that
-// reflects these modes better
-/// How to treat the transmit buffer
+impl From<RxFifoMode> for RxFifoModeVariant {
+    fn from(val: RxFifoMode) -> Self {
+        val.0
+    }
+}
+
+/// Mode of operation for the transmit queue
 #[derive(Default, Copy, Clone)]
-pub enum TxQueueSubmode {
-    /// Act as a FIFO
-    /// Messages are sent according to the get index
+pub enum TxQueueMode {
+    /// Messages are sent according to the order they are enqueued
     #[default]
-    Queue,
-    /// Act as a queue
-    /// Messages are sent with priority according to lowest ID
+    Fifo,
+    /// Messages are sent according to their priority
+    ///
+    /// Lower ID means higher priority. Messages of the same ID are sent in an
+    /// arbitrary order.
     Priority,
 }
 
-impl From<TxQueueSubmode> for bool {
-    fn from(val: TxQueueSubmode) -> Self {
+impl From<TxQueueMode> for bool {
+    fn from(val: TxQueueMode) -> Self {
         match val {
-            TxQueueSubmode::Priority => true,
-            TxQueueSubmode::Queue => false,
+            TxQueueMode::Priority => true,
+            TxQueueMode::Fifo => false,
         }
     }
 }
