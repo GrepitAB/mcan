@@ -1,6 +1,6 @@
 //! Pad declarations for the CAN buses
 
-use crate::config::bus::{BitTimingError, DATA_BIT_TIMING_RANGES, NOMINAL_BIT_TIMING_RANGES};
+use crate::config::{BitTimingError, DATA_BIT_TIMING_RANGES, NOMINAL_BIT_TIMING_RANGES};
 use crate::filter::{FiltersExtended, FiltersStandard};
 use crate::interrupt::InterruptConfiguration;
 use crate::messageram::SharedMemoryInner;
@@ -13,13 +13,11 @@ use core::convert::From;
 use core::fmt::{self, Debug};
 
 use super::{
-    config::{
-        bus::{CanConfig, FdFeatures, TestMode},
-        RamConfig,
-    },
+    config::{CanConfig, Mode},
     message::AnyMessage,
     messageram::{Capacities, SharedMemory},
 };
+use fugit::HertzU32;
 use generic_array::typenum::Unsigned;
 
 /// Printable PSR field
@@ -73,16 +71,18 @@ impl Debug for ErrorCounters {
     }
 }
 
-/// Errors that may during configuration
+/// Errors that may occur during configuration
 #[derive(Debug)]
 pub enum ConfigurationError {
     /// Problems with the bit timing configuration
     BitTiming(BitTimingError),
     /// Time stamp prescaler value is not in the range [1, 16]
     InvalidTimeStampPrescaler,
-    /// The provided memory is not addressable by the peripheral.
-    MemoryNotAddressable,
 }
+
+/// Error that may occur during construction
+#[derive(Debug)]
+pub struct MemoryNotAddressableError;
 
 impl From<BitTimingError> for ConfigurationError {
     fn from(value: BitTimingError) -> Self {
@@ -125,10 +125,30 @@ pub struct Can<'a, Id, D, C: Capacities> {
 /// Implementation details.
 pub struct Internals<'a, Id, D> {
     /// CAN bus peripheral
-    can: crate::reg::Can<Id>,
+    reg: crate::reg::Can<Id>,
     dependencies: D,
+    config: CanConfig,
     filters_standard: FiltersStandard<'a, Id>,
     filters_extended: FiltersExtended<'a, Id>,
+}
+
+impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Internals<'a, Id, D> {
+    fn configuration_mode(&self) {
+        self.reg.configuration_mode()
+    }
+
+    /// Re-enters "Normal Operation" if in "Software Initialization" mode.
+    /// In Software Initialization, messages are not received or transmitted.
+    /// Configuration cannot be changed. In Normal Operation, messages can
+    /// be transmitted and received.
+    pub fn operational_mode(&self) {
+        self.reg.operational_mode();
+    }
+
+    /// Returns `true` if the peripheral is in "Normal Operation" mode.
+    pub fn is_operational(&self) -> bool {
+        self.reg.is_operational()
+    }
 }
 
 /// A CAN bus in configuration mode. Before messages can be sent and received,
@@ -166,31 +186,38 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         &mut self.0.interrupts
     }
 
+    /// Allows reconfiguring config
+    pub fn config(&mut self) -> &mut CanConfig {
+        &mut self.0.internals.config
+    }
+
     /// Apply parameters from a bus config struct
-    fn apply_bus_config(&mut self, config: &CanConfig) -> Result<(), ConfigurationError> {
+    fn apply_configuration(&mut self) -> Result<(), ConfigurationError> {
+        let reg = &self.0.internals.reg;
+        let config = &self.0.internals.config;
+        let dependencies = &self.0.internals.dependencies;
         if !(1..=16).contains(&config.timestamp.prescaler) {
             return Err(ConfigurationError::InvalidTimeStampPrescaler);
         }
 
-        let nominal_prescaler = config.nominal_timing.prescaler(
-            self.0.internals.dependencies.can_clock(),
-            &NOMINAL_BIT_TIMING_RANGES,
-        )?;
+        let nominal_prescaler = config
+            .nominal_timing
+            .prescaler(dependencies.can_clock(), &NOMINAL_BIT_TIMING_RANGES)?;
 
         // Safety: The configuration is checked to be valid when computing the prescaler
-        self.0.internals.can.nbtp.write(|w| unsafe {
+        reg.nbtp.write(|w| unsafe {
             w.nsjw()
-                .bits(config.nominal_timing.sjw)
+                .bits(config.nominal_timing.sjw - 1)
                 .ntseg1()
-                .bits(config.nominal_timing.phase_seg_1)
+                .bits(config.nominal_timing.phase_seg_1 - 1)
                 .ntseg2()
-                .bits(config.nominal_timing.phase_seg_2)
+                .bits(config.nominal_timing.phase_seg_2 - 1)
                 .nbrp()
                 .bits(nominal_prescaler - 1)
         });
 
         // Safety: Every bit pattern of TCP is valid.
-        self.0.internals.can.tscc.write(|w| unsafe {
+        reg.tscc.write(|w| unsafe {
             w.tss()
                 .variant(config.timestamp.select)
                 // Prescaler is 1 + tcp value.
@@ -198,51 +225,82 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
                 .bits(config.timestamp.prescaler - 1)
         });
 
-        match config.fd_mode {
-            FdFeatures::ClassicOnly => self
-                .0
-                .internals
-                .can
-                .cccr
-                .modify(|_, w| w.fdoe().clear_bit()),
-            FdFeatures::Fd {
+        match config.mode {
+            Mode::Classic => reg.cccr.modify(|_, w| w.fdoe().clear_bit()),
+            Mode::Fd {
                 allow_bit_rate_switching,
                 data_phase_timing,
             } => {
-                self.0
-                    .internals
-                    .can
-                    .cccr
+                reg.cccr
                     .modify(|_, w| w.fdoe().set_bit().brse().bit(allow_bit_rate_switching));
-                let data_divider = data_phase_timing.prescaler(
-                    self.0.internals.dependencies.can_clock(),
-                    &DATA_BIT_TIMING_RANGES,
-                )?;
+                let data_prescaler = data_phase_timing
+                    .prescaler(dependencies.can_clock(), &DATA_BIT_TIMING_RANGES)?;
                 // Safety: The configuration is checked to be valid when computing the prescaler
-                self.0.internals.can.dbtp.write(|w| unsafe {
+                reg.dbtp.write(|w| unsafe {
                     w.dsjw()
-                        .bits(data_phase_timing.sjw)
+                        .bits(data_phase_timing.sjw - 1)
                         .dtseg1()
-                        .bits(data_phase_timing.phase_seg_1)
+                        .bits(data_phase_timing.phase_seg_1 - 1)
                         .dtseg2()
-                        .bits(data_phase_timing.phase_seg_2)
+                        .bits(data_phase_timing.phase_seg_2 - 1)
                         .dbrp()
-                        .bits((data_divider - 1) as u8)
+                        .bits((data_prescaler - 1) as u8)
                 });
             }
         };
 
-        // Global filter options
-        self.0.internals.can.gfc.write(|w| {
+        // Global filter configuration
+        // This setting is redundant and the same behaviour is achievable through main
+        // filter API
+        reg.gfc.write(|w| {
             w.anfs()
-                .variant(config.nm_std.into())
+                .variant(crate::reg::gfc::ANFS_A::REJECT)
                 .anfe()
-                .variant(config.nm_ext.into())
+                .variant(crate::reg::gfc::ANFE_A::REJECT)
         });
 
         // Configure test/loopback mode
-        self.set_test(config.test);
+        reg.cccr.modify(|_, w| w.test().bit(config.loopback));
+        reg.test.modify(|_, w| w.lbck().bit(config.loopback));
 
+        // Configure RX FIFO 0
+        reg.rxf0.c.modify(|_, w| {
+            let w = w.fom().bit(config.rx_fifo_0.mode.into());
+            let mut watermark = config.rx_fifo_0.watermark;
+            // According to the spec, any value >= 64 is interpreted as watermark disabled
+            if watermark >= 64 {
+                watermark = 64;
+            }
+            // Safety: The value is sanitized before the write
+            unsafe { w.fwm().bits(watermark) }
+        });
+
+        // Configure RX FIFO 1
+        reg.rxf1.c.modify(|_, w| {
+            let w = w.fom().bit(config.rx_fifo_1.mode.into());
+            let mut watermark = config.rx_fifo_1.watermark;
+            // According to the spec, any value >= 64 is interpreted as watermark disabled
+            if watermark >= 64 {
+                watermark = 64;
+            }
+            // Safety: The value is sanitized before the write
+            unsafe { w.fwm().bits(watermark) }
+        });
+
+        // Configure Tx Buffer
+        reg.txbc
+            .modify(|_, w| w.tfqm().bit(config.tx.tx_queue_submode.into()));
+
+        // Configure Tx Event Fifo
+        reg.txefc.modify(|_, w| {
+            let mut watermark = config.tx.tx_event_fifo_watermark;
+            // According to the spec, any value >= 32 is interpreted as watermark disabled
+            if watermark >= 32 {
+                watermark = 32;
+            }
+            // Safety: The value is sanitized before the write
+            unsafe { w.efwm().bits(watermark) }
+        });
         Ok(())
     }
 
@@ -252,175 +310,102 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
     /// only safeguard keeping the bus operational. Apart from that, the
     /// memory RAM is largely unchecked and an improperly configured linker
     /// script could interfere with bus operations.
-    fn apply_ram_config(
-        can: &crate::reg::Can<Id>,
-        mem: &SharedMemoryInner<C>,
-        config: &RamConfig,
-    ) -> Result<(), ConfigurationError> {
-        if !mem.is_addressable() {
-            return Err(ConfigurationError::MemoryNotAddressable);
-        }
+    fn apply_ram_config(reg: &crate::reg::Can<Id>, mem: &SharedMemoryInner<C>) {
+        // Standard id
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Length is checked at compile-time on the `Capacities` constraints level
+        reg.sidfc.write(|w| unsafe {
+            w.flssa()
+                .bits(&mem.filters_standard as *const _ as u16)
+                .lss()
+                .bits(mem.filters_standard.len() as u8)
+        });
 
-        unsafe {
-            // Standard id
-            can.sidfc.write(|w| {
-                w.flssa()
-                    .bits(&mem.filters_standard as *const _ as u16)
-                    .lss()
-                    .bits(mem.filters_standard.len() as u8)
-            });
+        // Extended id
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Length is checked at compile-time on the `Capacities` constraints level
+        reg.xidfc.write(|w| unsafe {
+            w.flesa()
+                .bits(&mem.filters_extended as *const _ as u16)
+                .lse()
+                .bits(mem.filters_extended.len() as u8)
+        });
 
-            // Extended id
-            can.xidfc.write(|w| {
-                w.flesa()
-                    .bits(&mem.filters_extended as *const _ as u16)
-                    .lse()
-                    .bits(mem.filters_extended.len() as u8)
-            });
+        // RX buffers
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        reg.rxbc
+            .write(|w| unsafe { w.rbsa().bits(&mem.rx_dedicated_buffers as *const _ as u16) });
 
-            // RX buffers
-            can.rxbc
-                .write(|w| w.rbsa().bits(&mem.rx_dedicated_buffers as *const _ as u16));
+        // Data field size for buffers and FIFOs
+        reg.rxesc.write(|w| {
+            w.rbds()
+                .bits(C::RxBufferMessage::REG)
+                .f0ds()
+                .bits(C::RxFifo0Message::REG)
+                .f1ds()
+                .bits(C::RxFifo1Message::REG)
+        });
 
-            // Data field size for buffers and FIFOs
-            can.rxesc.write(|w| {
-                w.rbds()
-                    .bits(C::RxBufferMessage::REG)
-                    .f0ds()
-                    .bits(C::RxFifo0Message::REG)
-                    .f1ds()
-                    .bits(C::RxFifo1Message::REG)
-            });
+        // RX FIFO 0
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Length is checked at compile-time on the `Capacities` constraints level
+        reg.rxf0.c.write(|w| unsafe {
+            w.fsa()
+                .bits(&mem.rx_fifo_0 as *const _ as u16)
+                .fs()
+                .bits(mem.rx_fifo_0.len() as u8)
+        });
 
-            //// RX FIFO 0
-            can.rxf0.c.write(|w| {
-                w.fom()
-                    .bit(config.rxf0.mode.clone().into())
-                    .fwm()
-                    .bits(config.rxf0.watermark)
-                    .fs()
-                    .bits(mem.rx_fifo_0.len() as u8)
-                    .fsa()
-                    .bits(&mem.rx_fifo_0 as *const _ as u16)
-            });
+        // RX FIFO 1
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Length is checked at compile-time on the `Capacities` constraints level
+        reg.rxf1.c.write(|w| unsafe {
+            w.fsa()
+                .bits(&mem.rx_fifo_1 as *const _ as u16)
+                .fs()
+                .bits(mem.rx_fifo_1.len() as u8)
+        });
 
-            //// RX FIFO 1
-            can.rxf1.c.write(|w| {
-                w.fom()
-                    .bit(config.rxf1.mode.clone().into())
-                    .fwm()
-                    .bits(config.rxf1.watermark)
-                    .fs()
-                    .bits(mem.rx_fifo_1.len() as u8)
-                    .fsa()
-                    .bits(&mem.rx_fifo_1 as *const _ as u16)
-            });
+        // TX buffers
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Lengths are checked at compile-time on the `Capacities` constraints level
+        reg.txbc.write(|w| unsafe {
+            w.tfqs()
+                .bits(<C::TxBuffers as Unsigned>::U8 - <C::DedicatedTxBuffers as Unsigned>::U8)
+                .ndtb()
+                .bits(<C::DedicatedTxBuffers as Unsigned>::U8)
+                .tbsa()
+                .bits(&mem.tx_buffers as *const _ as u16)
+        });
 
-            // TX buffers
-            can.txbc.write(|w| {
-                w.tfqm()
-                    .bit(config.txbc.mode.clone().into())
-                    .tfqs()
-                    .bits(<C::TxBuffers as Unsigned>::U8 - <C::DedicatedTxBuffers as Unsigned>::U8)
-                    .ndtb()
-                    .bits(<C::DedicatedTxBuffers as Unsigned>::U8)
-                    .tbsa()
-                    .bits(&mem.tx_buffers as *const _ as u16)
-            });
+        // TX element size config
+        reg.txesc.write(|w| w.tbds().bits(C::TxMessage::REG));
 
-            // TX element size config
-            can.txesc.write(|w| w.tbds().bits(C::TxMessage::REG));
-
-            // TX events
-            can.txefc.write(|w| {
-                w.efwm()
-                    .bits(config.txefc.watermark)
-                    .efs()
-                    .bits(mem.tx_event_fifo.len() as u8)
-                    .efsa()
-                    .bits(&mem.tx_event_fifo as *const _ as u16)
-            });
-        }
-        Ok(())
+        // TX events
+        //
+        // Safety:
+        // - Pointer is valid assuming SharedMemory location is within first 64K of RAM
+        // - Lengths are checked at compile-time on the `Capacities` constraints level
+        reg.txefc.write(|w| unsafe {
+            w.efsa()
+                .bits(&mem.tx_event_fifo as *const _ as u16)
+                .efs()
+                .bits(mem.tx_event_fifo.len() as u8)
+        });
     }
 
-    /// Configure test mode
-    pub fn set_fd(&mut self, fd: FdFeatures) {
-        self.0
-            .internals
-            .can
-            .cccr
-            .modify(|_, w| w.fdoe().bit(matches!(fd, FdFeatures::Fd { .. })));
-    }
-
-    /// Configure test mode
-    fn set_test(&mut self, test: TestMode) {
-        match test {
-            TestMode::Disabled => {
-                self.0.internals.can.cccr.modify(|_, w| w.test().bit(false));
-                self.0.internals.can.test.modify(|_, w| w.lbck().bit(false));
-            }
-            TestMode::Loopback => {
-                self.0.internals.can.cccr.modify(|_, w| w.test().bit(true));
-                self.0.internals.can.test.modify(|_, w| w.lbck().bit(true));
-            }
-        }
-    }
-}
-
-impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Can<'_, Id, D, C> {
-    /// Raw access to the registers.
-    ///
-    /// # Safety
-    /// The abstraction assumes that it has exclusive ownership of the
-    /// registers. Direct access can break such assumptions. Direct access
-    /// can break assumptions
-    pub unsafe fn registers(&self) -> &crate::reg::Can<Id> {
-        &self.internals.can
-    }
-
-    /// Switches between "Software Initialization" mode and "Normal Operation".
-    /// In Software Initialization, messages are not received or transmitted.
-    /// Configuration cannot be changed. In Normal Operation, messages can
-    /// be transmitted and received.
-    pub fn set_init(&mut self, init: bool) {
-        self.internals.can.cccr.modify(|_, w| w.init().bit(init));
-        while self.internals.can.cccr.read().init().bit() != init {}
-    }
-
-    fn enable_configuration_change(&mut self) {
-        self.set_init(true);
-        self.internals.can.cccr.modify(|_, w| w.cce().set_bit());
-        while !self.internals.can.cccr.read().cce().bit() {}
-    }
-}
-
-impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> CanBus
-    for Can<'_, Id, D, C>
-{
-    fn error_counters(&self) -> ErrorCounters {
-        self.internals.can.ecr.read().into()
-    }
-
-    fn protocol_status(&self) -> ProtocolStatus {
-        self.internals.can.psr.read().into()
-    }
-
-    fn ts_count(&self) -> u16 {
-        self.internals.can.tscv.read().tsc().bits()
-    }
-}
-
-impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Can<'a, Id, D, C> {
-    pub fn configure(mut self) -> CanConfigurable<'a, Id, D, C> {
-        self.enable_configuration_change();
-        CanConfigurable(self)
-    }
-}
-
-impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
-    CanConfigurable<'a, Id, D, C>
-{
     /// Create new can peripheral.
     ///
     /// The hardware requires that SharedMemory is contained within the first
@@ -430,20 +415,25 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
     /// The returned peripheral is not operational; use [`Self::finalize`] to
     /// finish configuration and start transmitting and receiving.
     pub fn new(
+        bitrate: HertzU32,
         dependencies: D,
-        can_cfg: CanConfig,
-        ram_cfg: RamConfig,
         memory: &'a mut SharedMemory<C>,
-    ) -> Result<Self, ConfigurationError> {
+    ) -> Result<Self, MemoryNotAddressableError> {
         // Safety:
         // Since `dependencies` field implies ownership of the HW register pointed to by
         // `Id: CanId`, `can` has a unique access to it
-        let can = unsafe { crate::reg::Can::<Id>::new() };
+        let reg = unsafe { crate::reg::Can::<Id>::new() };
+
+        reg.configuration_mode();
+
+        if !memory.is_addressable() {
+            return Err(MemoryNotAddressableError);
+        }
 
         let memory = memory.init();
-        Self::apply_ram_config(&can, memory, &ram_cfg)?;
+        Self::apply_ram_config(&reg, memory);
 
-        let mut bus = Can {
+        let can = CanConfigurable(Can {
             // Safety: Since `Can::new` takes a PAC singleton, it can only be called once. Then no
             // duplicates will be constructed. The registers that are delegated to these components
             // should not be touched by any other code. This has to be upheld by all code that has
@@ -457,23 +447,60 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             tx: unsafe { Tx::new(&mut memory.tx_buffers) },
             tx_event_fifo: unsafe { TxEventFifo::new(&mut memory.tx_event_fifo) },
             internals: Internals {
-                can,
+                reg,
                 dependencies,
+                config: CanConfig::new(bitrate),
                 // Safety: The memory is zeroed by `memory.init`, so all filters are initially
                 // disabled.
                 filters_standard: unsafe { FiltersStandard::new(&mut memory.filters_standard) },
                 filters_extended: unsafe { FiltersExtended::new(&mut memory.filters_extended) },
             },
-        }
-        .configure();
+        });
 
-        bus.apply_bus_config(&can_cfg)?;
-        Ok(bus)
+        Ok(can)
     }
 
     /// Locks the configuration and enters normal operation.
-    pub fn finalize(mut self) -> Can<'a, Id, D, C> {
-        self.0.set_init(false);
-        self.0
+    pub fn finalize(mut self) -> Result<Can<'a, Id, D, C>, ConfigurationError> {
+        self.apply_configuration()?;
+
+        let can = self.0;
+
+        // Enter normal operation (CCE is set to 0 automatically)
+        can.internals.operational_mode();
+
+        Ok(can)
+    }
+}
+
+impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Can<'a, Id, D, C> {
+    /// Raw access to the registers.
+    ///
+    /// # Safety
+    /// The abstraction assumes that it has exclusive ownership of the
+    /// registers. Direct access can break such assumptions.
+    pub unsafe fn registers(&self) -> &crate::reg::Can<Id> {
+        &self.internals.reg
+    }
+
+    pub fn configure(self) -> CanConfigurable<'a, Id, D, C> {
+        self.internals.configuration_mode();
+        CanConfigurable(self)
+    }
+}
+
+impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> CanBus
+    for Can<'_, Id, D, C>
+{
+    fn error_counters(&self) -> ErrorCounters {
+        self.internals.reg.ecr.read().into()
+    }
+
+    fn protocol_status(&self) -> ProtocolStatus {
+        self.internals.reg.psr.read().into()
+    }
+
+    fn ts_count(&self) -> u16 {
+        self.internals.reg.tscv.read().tsc().bits()
     }
 }

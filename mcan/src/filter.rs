@@ -101,9 +101,10 @@ pub enum Filter {
 }
 
 /// Store buffer message types
-#[derive(Copy, Clone)]
+#[derive(Default, Copy, Clone)]
 pub enum SbMsgType {
     /// Store into RX buffer slot poitner to by id
+    #[default]
     RxBuffer = 0,
     /// Debug message A
     DebugA,
@@ -111,12 +112,6 @@ pub enum SbMsgType {
     DebugB,
     /// Debug message C
     DebugC,
-}
-
-impl Default for SbMsgType {
-    fn default() -> Self {
-        Self::RxBuffer
-    }
 }
 
 /// Message filter field for 28-bit RX messages
