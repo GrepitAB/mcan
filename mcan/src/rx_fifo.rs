@@ -73,7 +73,8 @@ where
         self.memory.len()
     }
 
-    /// Returns a received frame if available
+    /// Returns a received frame if available. Note that the FIFO also
+    /// implements [`Iterator`] to receive messages until the queue is empty.
     pub fn receive(&mut self) -> nb::Result<M, Infallible> {
         let status = self.regs().s.read();
         let len = status.ffl().bits();
@@ -89,5 +90,16 @@ where
             self.regs().a.write(|w| w.fai().bits(get_index as u8));
         }
         Ok(message)
+    }
+}
+
+impl<'a, F, P: mcan_core::CanId, M: rx::AnyMessage> Iterator for RxFifo<'a, F, P, M>
+where
+    Self: GetRxFifoRegs,
+{
+    type Item = M;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.receive().ok()
     }
 }

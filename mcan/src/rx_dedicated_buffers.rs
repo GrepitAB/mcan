@@ -105,3 +105,11 @@ impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
             .ok_or(nb::Error::WouldBlock)
     }
 }
+
+impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> Iterator for RxDedicatedBuffer<'a, P, M> {
+    type Item = M;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.receive_any().ok()
+    }
+}
