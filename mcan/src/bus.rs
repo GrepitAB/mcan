@@ -11,6 +11,7 @@ use crate::tx_buffers::Tx;
 use crate::tx_event_fifo::TxEventFifo;
 use core::convert::From;
 use core::fmt::{self, Debug};
+use core::ops::Deref;
 
 use super::{
     config::{CanConfig, Mode},
@@ -20,8 +21,16 @@ use super::{
 use fugit::HertzU32;
 use generic_array::typenum::Unsigned;
 
-/// Printable PSR field
-pub struct ProtocolStatus(pub PSR);
+/// Wrapper for the protocol status register
+pub struct ProtocolStatus(PSR);
+
+impl Deref for ProtocolStatus {
+    type Target = PSR;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl From<PSR> for ProtocolStatus {
     fn from(value: PSR) -> Self {
@@ -31,26 +40,32 @@ impl From<PSR> for ProtocolStatus {
 
 impl Debug for ProtocolStatus {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> fmt::Result {
-        let psr = &self.0;
-
         f.debug_struct("ProtocolStatus")
-            .field("tdcv", &psr.tdcv().bits())
-            .field("pxe", &psr.pxe().bits())
-            .field("rfdf", &psr.rfdf().bits())
-            .field("rbrs", &psr.rbrs().bits())
-            .field("resi", &psr.resi().bits())
-            .field("dlec", &psr.dlec().bits())
-            .field("bo", &psr.bo().bits())
-            .field("ew", &psr.ew().bits())
-            .field("ep", &psr.ep().bits())
-            .field("act", &psr.act().bits())
-            .field("lec", &psr.lec().bits())
+            .field("tdcv", &self.tdcv().bits())
+            .field("pxe", &self.pxe().bits())
+            .field("rfdf", &self.rfdf().bits())
+            .field("rbrs", &self.rbrs().bits())
+            .field("resi", &self.resi().bits())
+            .field("dlec", &self.dlec().bits())
+            .field("bo", &self.bo().bits())
+            .field("ew", &self.ew().bits())
+            .field("ep", &self.ep().bits())
+            .field("act", &self.act().bits())
+            .field("lec", &self.lec().bits())
             .finish()
     }
 }
 
-/// Printable ECR field
-pub struct ErrorCounters(pub ECR);
+/// Wrapper for the error counters register
+pub struct ErrorCounters(ECR);
+
+impl Deref for ErrorCounters {
+    type Target = ECR;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl From<ECR> for ErrorCounters {
     fn from(value: ECR) -> Self {
@@ -60,13 +75,11 @@ impl From<ECR> for ErrorCounters {
 
 impl Debug for ErrorCounters {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> fmt::Result {
-        let ecr = &self.0;
-
         f.debug_struct("ErrorCounters")
-            .field("cel", &ecr.cel().bits())
-            .field("rec", &ecr.rec().bits())
-            .field("rp", &ecr.rp().bit())
-            .field("tec", &ecr.tec().bits())
+            .field("cel", &self.cel().bits())
+            .field("rec", &self.rec().bits())
+            .field("rp", &self.rp().bit())
+            .field("tec", &self.tec().bits())
             .finish()
     }
 }
@@ -93,17 +106,6 @@ impl From<BitTimingError> for ConfigurationError {
 /// Index is out of bounds
 #[derive(Debug)]
 pub struct OutOfBounds;
-
-/// Common CANbus functionality
-/// TODO: build interrupt struct around this
-pub trait CanBus {
-    /// Read error counters
-    fn error_counters(&self) -> ErrorCounters;
-    /// Read additional status information
-    fn protocol_status(&self) -> ProtocolStatus;
-    /// Get current time
-    fn ts_count(&self) -> u16;
-}
 
 /// A CAN bus that is not in configuration mode (CCE=0). Some errors (including
 /// Bus_Off) can asynchronously stop bus operation (INIT=1), which will require
@@ -148,6 +150,25 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Internals<'a, Id,
     /// Returns `true` if the peripheral is in "Normal Operation" mode.
     pub fn is_operational(&self) -> bool {
         self.reg.is_operational()
+    }
+
+    /// Access the error counters register value
+    pub fn error_counters(&self) -> ErrorCounters {
+        ErrorCounters(self.reg.ecr.read())
+    }
+
+    /// Access the protocol status register value
+    ///
+    /// Reading the register clears fields: PXE, RFDF, RBRS, RESI, DLEC, LEC.
+    pub fn protocol_status(&self) -> ProtocolStatus {
+        ProtocolStatus(self.reg.psr.read())
+    }
+
+    /// Current value of the timestamp counter
+    ///
+    /// If timestamping is disabled, its value is zero.
+    pub fn timestamp(&self) -> u16 {
+        self.reg.tscv.read().tsc().bits()
     }
 }
 
@@ -486,21 +507,5 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Ca
     pub fn configure(self) -> CanConfigurable<'a, Id, D, C> {
         self.internals.configuration_mode();
         CanConfigurable(self)
-    }
-}
-
-impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> CanBus
-    for Can<'_, Id, D, C>
-{
-    fn error_counters(&self) -> ErrorCounters {
-        self.internals.reg.ecr.read().into()
-    }
-
-    fn protocol_status(&self) -> ProtocolStatus {
-        self.internals.reg.psr.read().into()
-    }
-
-    fn ts_count(&self) -> u16 {
-        self.internals.reg.tscv.read().tsc().bits()
     }
 }
