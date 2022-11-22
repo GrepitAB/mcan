@@ -11,6 +11,31 @@ pub struct RxFifo<'a, F, P, M: rx::AnyMessage> {
     _markers: PhantomData<(F, P)>,
 }
 
+/// Trait which erases generic parametrization for [`RxFifo`] type
+pub trait DynRxFifo {
+    /// RX FIFO identity type
+    type RxFifoId;
+
+    /// CAN identity type
+    type CanId;
+
+    /// Received message type
+    type Message;
+
+    /// Returns the number of elements in the queue
+    fn len(&self) -> usize;
+
+    /// Returns `true` if the queue is empty
+    fn is_empty(&self) -> bool;
+
+    /// Returns the number of elements the queue can hold
+    fn capacity(&self) -> usize;
+
+    /// Returns a received frame if available. Note that the FIFO also
+    /// implements [`Iterator`] to receive messages until the queue is empty.
+    fn receive(&mut self) -> nb::Result<Self::Message, Infallible>;
+}
+
 /// Value of the type-level FIFO selection enum representing FIFO 0.
 pub struct Fifo0;
 /// Value of the type-level FIFO selection enum representing FIFO 1.
@@ -57,25 +82,29 @@ where
         // Safety: The RxFifo owns the registers.
         unsafe { self.registers() }
     }
+}
 
-    /// Returns the number of elements in the queue
-    pub fn len(&self) -> usize {
+impl<'a, F, P: mcan_core::CanId, M: rx::AnyMessage> DynRxFifo for RxFifo<'a, F, P, M>
+where
+    Self: GetRxFifoRegs,
+{
+    type RxFifoId = F;
+    type CanId = P;
+    type Message = M;
+
+    fn len(&self) -> usize {
         self.regs().s.read().ffl().bits() as usize
     }
 
-    /// Returns `true` if the queue is empty
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// Returns the number of elements the queue can hold
-    pub fn capacity(&self) -> usize {
+    fn capacity(&self) -> usize {
         self.memory.len()
     }
 
-    /// Returns a received frame if available. Note that the FIFO also
-    /// implements [`Iterator`] to receive messages until the queue is empty.
-    pub fn receive(&mut self) -> nb::Result<M, Infallible> {
+    fn receive(&mut self) -> nb::Result<Self::Message, Infallible> {
         let status = self.regs().s.read();
         let len = status.ffl().bits();
         if len == 0 {

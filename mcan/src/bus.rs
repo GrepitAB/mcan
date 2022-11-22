@@ -11,6 +11,7 @@ use crate::tx_buffers::Tx;
 use crate::tx_event_fifo::TxEventFifo;
 use core::convert::From;
 use core::fmt::{self, Debug};
+use core::ops::Deref;
 
 use super::{
     config::{CanConfig, Mode},
@@ -20,8 +21,16 @@ use super::{
 use fugit::HertzU32;
 use generic_array::typenum::Unsigned;
 
-/// Printable PSR field
-pub struct ProtocolStatus(pub PSR);
+/// Wrapper for the protocol status register
+pub struct ProtocolStatus(PSR);
+
+impl Deref for ProtocolStatus {
+    type Target = PSR;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl From<PSR> for ProtocolStatus {
     fn from(value: PSR) -> Self {
@@ -31,26 +40,32 @@ impl From<PSR> for ProtocolStatus {
 
 impl Debug for ProtocolStatus {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> fmt::Result {
-        let psr = &self.0;
-
         f.debug_struct("ProtocolStatus")
-            .field("tdcv", &psr.tdcv().bits())
-            .field("pxe", &psr.pxe().bits())
-            .field("rfdf", &psr.rfdf().bits())
-            .field("rbrs", &psr.rbrs().bits())
-            .field("resi", &psr.resi().bits())
-            .field("dlec", &psr.dlec().bits())
-            .field("bo", &psr.bo().bits())
-            .field("ew", &psr.ew().bits())
-            .field("ep", &psr.ep().bits())
-            .field("act", &psr.act().bits())
-            .field("lec", &psr.lec().bits())
+            .field("tdcv", &self.tdcv().bits())
+            .field("pxe", &self.pxe().bits())
+            .field("rfdf", &self.rfdf().bits())
+            .field("rbrs", &self.rbrs().bits())
+            .field("resi", &self.resi().bits())
+            .field("dlec", &self.dlec().bits())
+            .field("bo", &self.bo().bits())
+            .field("ew", &self.ew().bits())
+            .field("ep", &self.ep().bits())
+            .field("act", &self.act().bits())
+            .field("lec", &self.lec().bits())
             .finish()
     }
 }
 
-/// Printable ECR field
-pub struct ErrorCounters(pub ECR);
+/// Wrapper for the error counters register
+pub struct ErrorCounters(ECR);
+
+impl Deref for ErrorCounters {
+    type Target = ECR;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl From<ECR> for ErrorCounters {
     fn from(value: ECR) -> Self {
@@ -60,13 +75,11 @@ impl From<ECR> for ErrorCounters {
 
 impl Debug for ErrorCounters {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> fmt::Result {
-        let ecr = &self.0;
-
         f.debug_struct("ErrorCounters")
-            .field("cel", &ecr.cel().bits())
-            .field("rec", &ecr.rec().bits())
-            .field("rp", &ecr.rp().bit())
-            .field("tec", &ecr.tec().bits())
+            .field("cel", &self.cel().bits())
+            .field("rec", &self.rec().bits())
+            .field("rp", &self.rp().bit())
+            .field("tec", &self.tec().bits())
             .finish()
     }
 }
@@ -94,17 +107,6 @@ impl From<BitTimingError> for ConfigurationError {
 #[derive(Debug)]
 pub struct OutOfBounds;
 
-/// Common CANbus functionality
-/// TODO: build interrupt struct around this
-pub trait CanBus {
-    /// Read error counters
-    fn error_counters(&self) -> ErrorCounters;
-    /// Read additional status information
-    fn protocol_status(&self) -> ProtocolStatus;
-    /// Get current time
-    fn ts_count(&self) -> u16;
-}
-
 /// A CAN bus that is not in configuration mode (CCE=0). Some errors (including
 /// Bus_Off) can asynchronously stop bus operation (INIT=1), which will require
 /// user intervention to reactivate the bus to resume sending and receiving
@@ -117,13 +119,13 @@ pub struct Can<'a, Id, D, C: Capacities> {
     pub rx_dedicated_buffers: RxDedicatedBuffer<'a, Id, C::RxBufferMessage>,
     pub tx: Tx<'a, Id, C>,
     pub tx_event_fifo: TxEventFifo<'a, Id>,
-
-    /// Implementation details. The field is public to allow destructuring.
-    pub internals: Internals<'a, Id, D>,
+    pub aux: Aux<'a, Id, D>,
 }
 
-/// Implementation details.
-pub struct Internals<'a, Id, D> {
+/// Auxiliary struct
+///
+/// Provides unsafe low-level register access as well as other common CAN APIs
+pub struct Aux<'a, Id, D> {
     /// CAN bus peripheral
     reg: crate::reg::Can<Id>,
     dependencies: D,
@@ -132,22 +134,65 @@ pub struct Internals<'a, Id, D> {
     filters_extended: FiltersExtended<'a, Id>,
 }
 
-impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Internals<'a, Id, D> {
-    fn configuration_mode(&self) {
-        self.reg.configuration_mode()
-    }
+/// Trait which erases generic parametrization for [`Aux`] type
+pub trait DynAux {
+    /// CAN identity type
+    type Id;
+
+    /// CAN dependencies type
+    type Deps;
 
     /// Re-enters "Normal Operation" if in "Software Initialization" mode.
     /// In Software Initialization, messages are not received or transmitted.
     /// Configuration cannot be changed. In Normal Operation, messages can
     /// be transmitted and received.
-    pub fn operational_mode(&self) {
+    fn operational_mode(&self);
+
+    /// Returns `true` if the peripheral is in "Normal Operation" mode.
+    fn is_operational(&self) -> bool;
+
+    /// Access the error counters register value
+    fn error_counters(&self) -> ErrorCounters;
+
+    /// Access the protocol status register value
+    ///
+    /// Reading the register clears fields: PXE, RFDF, RBRS, RESI, DLEC, LEC.
+    fn protocol_status(&self) -> ProtocolStatus;
+
+    /// Current value of the timestamp counter
+    ///
+    /// If timestamping is disabled, its value is zero.
+    fn timestamp(&self) -> u16;
+}
+
+impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Aux<'a, Id, D> {
+    fn configuration_mode(&self) {
+        self.reg.configuration_mode()
+    }
+}
+
+impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'a, Id, D> {
+    type Id = Id;
+    type Deps = D;
+
+    fn operational_mode(&self) {
         self.reg.operational_mode();
     }
 
-    /// Returns `true` if the peripheral is in "Normal Operation" mode.
-    pub fn is_operational(&self) -> bool {
+    fn is_operational(&self) -> bool {
         self.reg.is_operational()
+    }
+
+    fn error_counters(&self) -> ErrorCounters {
+        ErrorCounters(self.reg.ecr.read())
+    }
+
+    fn protocol_status(&self) -> ProtocolStatus {
+        ProtocolStatus(self.reg.psr.read())
+    }
+
+    fn timestamp(&self) -> u16 {
+        self.reg.tscv.read().tsc().bits()
     }
 }
 
@@ -173,12 +218,12 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
 
     /// Allows reconfiguring the acceptance filters for standard IDs.
     pub fn filters_standard(&mut self) -> &mut FiltersStandard<'a, Id> {
-        &mut self.0.internals.filters_standard
+        &mut self.0.aux.filters_standard
     }
 
     /// Allows reconfiguring the acceptance filters for extended IDs.
     pub fn filters_extended(&mut self) -> &mut FiltersExtended<'a, Id> {
-        &mut self.0.internals.filters_extended
+        &mut self.0.aux.filters_extended
     }
 
     /// Allows reconfiguring interrupts.
@@ -188,14 +233,14 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
 
     /// Allows reconfiguring config
     pub fn config(&mut self) -> &mut CanConfig {
-        &mut self.0.internals.config
+        &mut self.0.aux.config
     }
 
     /// Apply parameters from a bus config struct
     fn apply_configuration(&mut self) -> Result<(), ConfigurationError> {
-        let reg = &self.0.internals.reg;
-        let config = &self.0.internals.config;
-        let dependencies = &self.0.internals.dependencies;
+        let reg = &self.0.aux.reg;
+        let config = &self.0.aux.config;
+        let dependencies = &self.0.aux.dependencies;
         if !(1..=16).contains(&config.timestamp.prescaler) {
             return Err(ConfigurationError::InvalidTimeStampPrescaler);
         }
@@ -446,7 +491,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             },
             tx: unsafe { Tx::new(&mut memory.tx_buffers) },
             tx_event_fifo: unsafe { TxEventFifo::new(&mut memory.tx_event_fifo) },
-            internals: Internals {
+            aux: Aux {
                 reg,
                 dependencies,
                 config: CanConfig::new(bitrate),
@@ -467,7 +512,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         let can = self.0;
 
         // Enter normal operation (CCE is set to 0 automatically)
-        can.internals.operational_mode();
+        can.aux.operational_mode();
 
         Ok(can)
     }
@@ -480,27 +525,11 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Ca
     /// The abstraction assumes that it has exclusive ownership of the
     /// registers. Direct access can break such assumptions.
     pub unsafe fn registers(&self) -> &crate::reg::Can<Id> {
-        &self.internals.reg
+        &self.aux.reg
     }
 
     pub fn configure(self) -> CanConfigurable<'a, Id, D, C> {
-        self.internals.configuration_mode();
+        self.aux.configuration_mode();
         CanConfigurable(self)
-    }
-}
-
-impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> CanBus
-    for Can<'_, Id, D, C>
-{
-    fn error_counters(&self) -> ErrorCounters {
-        self.internals.reg.ecr.read().into()
-    }
-
-    fn protocol_status(&self) -> ProtocolStatus {
-        self.internals.reg.psr.read().into()
-    }
-
-    fn ts_count(&self) -> u16 {
-        self.internals.reg.tscv.read().tsc().bits()
     }
 }

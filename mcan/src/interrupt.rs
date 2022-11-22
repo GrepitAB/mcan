@@ -349,6 +349,23 @@ impl Iterator for Iter {
 /// safe access to the owned interrupt flags.
 pub struct OwnedInterruptSet<P>(InterruptSet, PhantomData<P>);
 
+/// Trait which erases generic parametrization for [`OwnedInterruptSet`] type
+pub trait DynOwnedInterruptSet {
+    /// CAN identity type
+    type Id;
+
+    /// Clears the flagged interrupts owned by this `OwnedInterruptSet` and
+    /// provides an iterator over the flags that were cleared.
+    fn iter_flagged(&self) -> Iter;
+
+    /// Get the subset of interrupts in this set that are currently flagged.
+    fn interrupt_flags(&self) -> InterruptSet;
+
+    /// Clear the indicated `interrupts`. Interrupts not owned by this
+    /// `OwnedInterruptSet` are silently ignored.
+    fn clear_interrupts(&self, interrupts: InterruptSet);
+}
+
 /// An input [`InterruptSet`] contained interrupts that were not available. The
 /// set wrapped in the error indicates which elements caused the problem.
 #[derive(Debug)]
@@ -390,14 +407,6 @@ impl<Id: mcan_core::CanId> OwnedInterruptSet<Id> {
         self.0 .0 |= other.0 .0;
     }
 
-    /// Clears the flagged interrupts owned by this `OwnedInterruptSet` and
-    /// provides an iterator over the flags that were cleared.
-    pub fn iter_flagged(&self) -> Iter {
-        let interrupts = self.interrupt_flags();
-        self.clear_interrupts(interrupts);
-        interrupts.iter()
-    }
-
     /// # Safety
     /// This gives access to reads and (through interior mutability) writes of
     /// IR. The bits not owned by this set must not be affected by these writes
@@ -405,17 +414,25 @@ impl<Id: mcan_core::CanId> OwnedInterruptSet<Id> {
     unsafe fn ir(&self) -> &reg::IR {
         &(*Id::register_block()).ir
     }
+}
 
-    /// Get the subset of interrupts in this set that are currently flagged.
-    pub fn interrupt_flags(&self) -> InterruptSet {
+impl<Id: mcan_core::CanId> DynOwnedInterruptSet for OwnedInterruptSet<Id> {
+    /// CAN identity type
+    type Id = Id;
+
+    fn iter_flagged(&self) -> Iter {
+        let interrupts = self.interrupt_flags();
+        self.clear_interrupts(interrupts);
+        interrupts.iter()
+    }
+
+    fn interrupt_flags(&self) -> InterruptSet {
         // Safety: The mask ensures that only flags under our control are returned.
         let masked = unsafe { self.ir().read().bits() & self.0 .0 };
         InterruptSet(masked)
     }
 
-    /// Clear the indicated `interrupts`. Interrupts not owned by this
-    /// `OwnedInterruptSet` are silently ignored.
-    pub fn clear_interrupts(&self, interrupts: InterruptSet) {
+    fn clear_interrupts(&self, interrupts: InterruptSet) {
         let masked = interrupts.0 & self.0 .0;
         // Safety: Writing a 0 bit leaves the flag unchanged, so masking the write with
         // the owned interrupts ensures no no other bits are affected. Reserved bits
@@ -430,6 +447,61 @@ impl<Id: mcan_core::CanId> OwnedInterruptSet<Id> {
 pub struct InterruptConfiguration<P> {
     disabled: OwnedInterruptSet<P>,
     _peripheral: PhantomData<P>,
+}
+
+/// Trait which erases generic parametrization for [`InterruptConfiguration`]
+/// type
+pub trait DynInterruptConfiguration {
+    /// CAN identity type
+    type Id;
+
+    /// Request to enable the set of `interrupts` on the chosen interrupt line.
+    /// Fails if some of the requested interrupts are already enabled.
+    fn enable(
+        &mut self,
+        interrupts: InterruptSet,
+        line: InterruptLine,
+    ) -> Result<OwnedInterruptSet<Self::Id>, MaskError>;
+
+    /// Disable the set of `interrupts` and move ownership back to the
+    /// `InterruptConfiguration`.
+    fn disable(&mut self, interrupts: OwnedInterruptSet<Self::Id>);
+
+    /// Set the interrupt line that will trigger for a set of peripheral
+    /// interrupts.
+    fn set_line(&mut self, interrupts: &OwnedInterruptSet<Self::Id>, line: InterruptLine);
+}
+
+impl<Id: mcan_core::CanId> DynInterruptConfiguration for InterruptConfiguration<Id> {
+    type Id = Id;
+
+    fn enable(
+        &mut self,
+        interrupts: InterruptSet,
+        line: InterruptLine,
+    ) -> Result<OwnedInterruptSet<Self::Id>, MaskError> {
+        let interrupts = self.disabled.split(interrupts)?;
+        self.set_line(&interrupts, line);
+        self.set_enabled(&interrupts, true);
+        Ok(interrupts)
+    }
+
+    fn disable(&mut self, interrupts: OwnedInterruptSet<Self::Id>) {
+        self.set_enabled(&interrupts, false);
+        self.disabled.join(interrupts);
+    }
+
+    fn set_line(&mut self, interrupts: &OwnedInterruptSet<Self::Id>, line: InterruptLine) {
+        self.enable_line(line);
+        let mask = interrupts.0 .0;
+        // Safety: The reserved bits are 0 by type invariant on `OwnedInterruptSet`.
+        self.ils().modify(|r, w| unsafe {
+            w.bits(match line {
+                InterruptLine::Line0 => r.bits() & !mask,
+                InterruptLine::Line1 => r.bits() | mask,
+            })
+        });
+    }
 }
 
 impl<Id: mcan_core::CanId> InterruptConfiguration<Id> {
@@ -466,40 +538,6 @@ impl<Id: mcan_core::CanId> InterruptConfiguration<Id> {
     fn ie(&self) -> &reg::IE {
         // Safety: The constructor sets self up to have exclusive access to IE.
         &unsafe { &*Id::register_block() }.ie
-    }
-
-    /// Request to enable the set of `interrupts` on the chosen interrupt line.
-    /// Fails if some of the requested interrupts are already enabled.
-    pub fn enable(
-        &mut self,
-        interrupts: InterruptSet,
-        line: InterruptLine,
-    ) -> Result<OwnedInterruptSet<Id>, MaskError> {
-        let interrupts = self.disabled.split(interrupts)?;
-        self.set_line(&interrupts, line);
-        self.set_enabled(&interrupts, true);
-        Ok(interrupts)
-    }
-
-    /// Disable the set of `interrupts` and move ownership back to the
-    /// `InterruptConfiguration`.
-    pub fn disable(&mut self, interrupts: OwnedInterruptSet<Id>) {
-        self.set_enabled(&interrupts, false);
-        self.disabled.join(interrupts);
-    }
-
-    /// Set the interrupt line that will trigger for a set of peripheral
-    /// interrupts.
-    pub fn set_line(&mut self, interrupts: &OwnedInterruptSet<Id>, line: InterruptLine) {
-        self.enable_line(line);
-        let mask = interrupts.0 .0;
-        // Safety: The reserved bits are 0 by type invariant on `OwnedInterruptSet`.
-        self.ils().modify(|r, w| unsafe {
-            w.bits(match line {
-                InterruptLine::Line0 => r.bits() & !mask,
-                InterruptLine::Line1 => r.bits() | mask,
-            })
-        });
     }
 
     fn enable_line(&mut self, line: InterruptLine) {

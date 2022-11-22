@@ -12,6 +12,21 @@ pub struct RxDedicatedBuffer<'a, P, M: rx::AnyMessage> {
     _markers: PhantomData<P>,
 }
 
+/// Trait which erases generic parametrization for [`RxDedicatedBuffer`] type
+pub trait DynRxDedicatedBuffer {
+    /// CAN identity type
+    type Id;
+
+    /// Received message type
+    type Message;
+
+    /// Returns a received frame from the selected buffer if available
+    fn receive(&mut self, index: usize) -> nb::Result<Self::Message, bus::OutOfBounds>;
+
+    /// Returns a received frame from any dedicated buffer if available
+    fn receive_any(&mut self) -> nb::Result<Self::Message, Infallible>;
+}
+
 impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
     /// # Safety
     /// The caller must be the owner or the peripheral referenced by `P`. The
@@ -83,16 +98,21 @@ impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
             Err(nb::Error::WouldBlock)
         }
     }
+}
 
-    /// Returns a received frame from the selected buffer if available
-    pub fn receive(&mut self, index: usize) -> nb::Result<M, bus::OutOfBounds> {
+impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> DynRxDedicatedBuffer
+    for RxDedicatedBuffer<'a, P, M>
+{
+    type Id = P;
+    type Message = M;
+
+    fn receive(&mut self, index: usize) -> nb::Result<Self::Message, bus::OutOfBounds> {
         let message = self.peek(index)?;
         self.mark_buffer_read(index);
         Ok(message)
     }
 
-    /// Returns a received frame from any dedicated buffer if available
-    pub fn receive_any(&mut self) -> nb::Result<M, Infallible> {
+    fn receive_any(&mut self) -> nb::Result<Self::Message, Infallible> {
         self.memory
             .iter()
             .enumerate()

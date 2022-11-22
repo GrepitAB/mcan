@@ -12,6 +12,90 @@ pub struct Tx<'a, P, C: Capacities> {
     _markers: PhantomData<P>,
 }
 
+/// Trait which erases generic parametrization for [`Tx`] type
+pub trait DynTx {
+    /// CAN identity type
+    type Id;
+
+    /// Transmitted message type
+    type Message;
+
+    /// Puts a frame in the specified dedicated transmit buffer to be sent on
+    /// the bus. Fails with [`nb::Error::WouldBlock`] if the transmit buffer
+    /// is full.
+    fn transmit_dedicated(
+        &mut self,
+        index: usize,
+        message: Self::Message,
+    ) -> nb::Result<(), bus::OutOfBounds>;
+
+    /// Puts a frame in the queue to be sent on the bus.
+    /// Fails with [`nb::Error::WouldBlock`] if the transmit buffer is full.
+    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), bus::OutOfBounds>;
+
+    /// Allow [`Interrupt::TransmissionCancellationFinished`] to be triggered by
+    /// `to_be_enabled`. Interrupts for other buffers remain unchanged.
+    ///
+    /// Note that the peripheral-level interrupt also needs to be enabled for
+    /// interrupts to reach the system interrupt controller.
+    ///
+    /// [`Interrupt::TransmissionCancellationFinished`]: crate::interrupt::Interrupt::TransmissionCancellationFinished
+    fn enable_cancellation_interrupt(&mut self, to_be_enabled: TxBufferSet);
+
+    /// Disallow [`Interrupt::TransmissionCancellationFinished`] to be triggered
+    /// by `to_be_disabled`. Interrupts for other buffers remain unchanged.
+    ///
+    /// [`Interrupt::TransmissionCancellationFinished`]: crate::interrupt::Interrupt::TransmissionCancellationFinished
+    fn disable_cancellation_interrupt(&mut self, to_be_disabled: TxBufferSet);
+
+    /// Allow [`Interrupt::TransmissionCompleted`] to be triggered by
+    /// `to_be_enabled`. Interrupts for other buffers remain unchanged.
+    ///
+    /// Note that the peripheral-level interrupt also needs to be enabled for
+    /// interrupts to reach the system interrupt controller.
+    ///
+    /// [`Interrupt::TransmissionCompleted`]: crate::interrupt::Interrupt::TransmissionCompleted
+    fn enable_transmission_completed_interrupt(&mut self, to_be_enabled: TxBufferSet);
+
+    /// Disallow [`Interrupt::TransmissionCompleted`] to be triggered by
+    /// `to_be_disabled`. Interrupts for other buffers remain unchanged.
+    ///
+    /// [`Interrupt::TransmissionCompleted`]: crate::interrupt::Interrupt::TransmissionCompleted
+    fn disable_transmission_completed_interrupt(&mut self, to_be_disabled: TxBufferSet);
+
+    /// Returns the set of `TxBuffer`s that the peripheral indicates have been
+    /// cancelled. The flags are only cleared when a new transmission is
+    /// requested for the buffer.
+    fn get_cancellation_flags(&self) -> TxBufferSet;
+
+    /// Returns the set of `TxBuffer`s that the peripheral indicates have been
+    /// successfully transmitted. The flags are only cleared when a new
+    /// transmission is requested for the buffer.
+    fn get_transmission_completed_flags(&self) -> TxBufferSet;
+
+    /// Returns an iterator over the set of `TxBuffer`s that the peripheral
+    /// indicates have been cancelled. The flags are only cleared when a new
+    /// transmission is requested for the buffer.
+    fn iter_cancellation_flags(&self) -> Iter;
+
+    /// Returns an iterator over the set of `TxBuffer`s that the peripheral
+    /// indicates have been successfully transmitted. The flags are only cleared
+    /// when a new transmission is requested for the buffer.
+    fn iter_transmission_completed_flags(&self) -> Iter;
+
+    /// Request cancellation of `to_be_canceled`. Returns
+    /// [`nb::Error::WouldBlock`] until the cancellation is finished. If a
+    /// buffer that has started transmission is canceled, it may still finish
+    /// successfully, in which case the corresponding
+    /// [`Self::get_transmission_completed_flags`] will be set. If the
+    /// cancellation flag is set, but not the transmission completed flag, the
+    /// transmission was either not started or was aborted due to an error.
+    fn cancel_multi(&mut self, to_be_canceled: TxBufferSet) -> nb::Result<(), Infallible>;
+
+    /// Request cancellation of a transmit buffer. See [`Self::cancel_multi`].
+    fn cancel(&mut self, index: usize) -> nb::Result<(), Infallible>;
+}
+
 impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
     /// # Safety
     /// The caller must be the owner or the peripheral referenced by `P`. The
@@ -114,20 +198,6 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
         Ok(())
     }
 
-    /// Puts a frame in the specified dedicated transmit buffer to be sent on
-    /// the bus. Fails with [`nb::Error::WouldBlock`] if the transmit buffer
-    /// is full.
-    pub fn transmit_dedicated(
-        &mut self,
-        index: usize,
-        message: C::TxMessage,
-    ) -> nb::Result<(), bus::OutOfBounds> {
-        if index > C::DedicatedTxBuffers::USIZE {
-            Err(bus::OutOfBounds)?;
-        }
-        self.transmit(index, message)
-    }
-
     /// Returns the put index if available. `None` if the queue is full.
     fn find_put_index(&self) -> Option<usize> {
         let status = self.txfqs().read();
@@ -138,95 +208,6 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
         }
     }
 
-    /// Puts a frame in the queue to be sent on the bus.
-    /// Fails with [`nb::Error::WouldBlock`] if the transmit buffer is full.
-    pub fn transmit_queued(&mut self, message: C::TxMessage) -> nb::Result<(), bus::OutOfBounds> {
-        let index = self.find_put_index().ok_or(nb::Error::WouldBlock)?;
-        self.transmit(index, message)
-    }
-
-    /// Allow [`Interrupt::TransmissionCancellationFinished`] to be triggered by
-    /// `to_be_enabled`. Interrupts for other buffers remain unchanged.
-    ///
-    /// Note that the peripheral-level interrupt also needs to be enabled for
-    /// interrupts to reach the system interrupt controller.
-    ///
-    /// [`Interrupt::TransmissionCancellationFinished`]: crate::interrupt::Interrupt::TransmissionCancellationFinished
-    pub fn enable_cancellation_interrupt(&mut self, to_be_enabled: TxBufferSet) {
-        // Safety: There are no reserved bit patterns.
-        unsafe {
-            self.txbcie()
-                .modify(|r, w| w.bits(r.bits() | to_be_enabled.0));
-        }
-    }
-
-    /// Disallow [`Interrupt::TransmissionCancellationFinished`] to be triggered
-    /// by `to_be_disabled`. Interrupts for other buffers remain unchanged.
-    ///
-    /// [`Interrupt::TransmissionCancellationFinished`]: crate::interrupt::Interrupt::TransmissionCancellationFinished
-    pub fn disable_cancellation_interrupt(&mut self, to_be_disabled: TxBufferSet) {
-        // Safety: There are no reserved bit patterns.
-        unsafe {
-            self.txbcie()
-                .modify(|r, w| w.bits(r.bits() & !to_be_disabled.0));
-        }
-    }
-
-    /// Allow [`Interrupt::TransmissionCompleted`] to be triggered by
-    /// `to_be_enabled`. Interrupts for other buffers remain unchanged.
-    ///
-    /// Note that the peripheral-level interrupt also needs to be enabled for
-    /// interrupts to reach the system interrupt controller.
-    ///
-    /// [`Interrupt::TransmissionCompleted`]: crate::interrupt::Interrupt::TransmissionCompleted
-    pub fn enable_transmission_completed_interrupt(&mut self, to_be_enabled: TxBufferSet) {
-        // Safety: There are no reserved bit patterns.
-        unsafe {
-            self.txbtie()
-                .modify(|r, w| w.bits(r.bits() | to_be_enabled.0));
-        }
-    }
-
-    /// Disallow [`Interrupt::TransmissionCompleted`] to be triggered by
-    /// `to_be_disabled`. Interrupts for other buffers remain unchanged.
-    ///
-    /// [`Interrupt::TransmissionCompleted`]: crate::interrupt::Interrupt::TransmissionCompleted
-    pub fn disable_transmission_completed_interrupt(&mut self, to_be_disabled: TxBufferSet) {
-        // Safety: There are no reserved bit patterns.
-        unsafe {
-            self.txbtie()
-                .modify(|r, w| w.bits(r.bits() & !to_be_disabled.0));
-        }
-    }
-
-    /// Returns the set of `TxBuffer`s that the peripheral indicates have been
-    /// cancelled. The flags are only cleared when a new transmission is
-    /// requested for the buffer.
-    pub fn get_cancellation_flags(&self) -> TxBufferSet {
-        TxBufferSet(self.txbcf().read().bits())
-    }
-
-    /// Returns the set of `TxBuffer`s that the peripheral indicates have been
-    /// successfully transmitted. The flags are only cleared when a new
-    /// transmission is requested for the buffer.
-    pub fn get_transmission_completed_flags(&self) -> TxBufferSet {
-        TxBufferSet(self.txbto().read().bits())
-    }
-
-    /// Returns an iterator over the set of `TxBuffer`s that the peripheral
-    /// indicates have been cancelled. The flags are only cleared when a new
-    /// transmission is requested for the buffer.
-    pub fn iter_cancellation_flags(&self) -> Iter {
-        self.get_cancellation_flags().iter()
-    }
-
-    /// Returns an iterator over the set of `TxBuffer`s that the peripheral
-    /// indicates have been successfully transmitted. The flags are only cleared
-    /// when a new transmission is requested for the buffer.
-    pub fn iter_transmission_completed_flags(&self) -> Iter {
-        self.get_transmission_completed_flags().iter()
-    }
-
     fn poll_canceled(&self, to_be_canceled: TxBufferSet) -> nb::Result<(), Infallible> {
         let already_canceled = self.get_cancellation_flags();
         if already_canceled.0 & to_be_canceled.0 == to_be_canceled.0 {
@@ -235,15 +216,77 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
             Err(nb::Error::WouldBlock)
         }
     }
+}
 
-    /// Request cancellation of `to_be_canceled`. Returns
-    /// [`nb::Error::WouldBlock`] until the cancellation is finished. If a
-    /// buffer that has started transmission is canceled, it may still finish
-    /// successfully, in which case the corresponding
-    /// [`Self::get_transmission_completed_flags`] will be set. If the
-    /// cancellation flag is set, but not the transmission completed flag, the
-    /// transmission was either not started or was aborted due to an error.
-    pub fn cancel_multi(&mut self, to_be_canceled: TxBufferSet) -> nb::Result<(), Infallible> {
+impl<'a, P: mcan_core::CanId, C: Capacities> DynTx for Tx<'a, P, C> {
+    type Id = P;
+    type Message = C::TxMessage;
+
+    fn transmit_dedicated(
+        &mut self,
+        index: usize,
+        message: Self::Message,
+    ) -> nb::Result<(), bus::OutOfBounds> {
+        if index > C::DedicatedTxBuffers::USIZE {
+            Err(bus::OutOfBounds)?;
+        }
+        self.transmit(index, message)
+    }
+
+    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), bus::OutOfBounds> {
+        let index = self.find_put_index().ok_or(nb::Error::WouldBlock)?;
+        self.transmit(index, message)
+    }
+
+    fn enable_cancellation_interrupt(&mut self, to_be_enabled: TxBufferSet) {
+        // Safety: There are no reserved bit patterns.
+        unsafe {
+            self.txbcie()
+                .modify(|r, w| w.bits(r.bits() | to_be_enabled.0));
+        }
+    }
+
+    fn disable_cancellation_interrupt(&mut self, to_be_disabled: TxBufferSet) {
+        // Safety: There are no reserved bit patterns.
+        unsafe {
+            self.txbcie()
+                .modify(|r, w| w.bits(r.bits() & !to_be_disabled.0));
+        }
+    }
+
+    fn enable_transmission_completed_interrupt(&mut self, to_be_enabled: TxBufferSet) {
+        // Safety: There are no reserved bit patterns.
+        unsafe {
+            self.txbtie()
+                .modify(|r, w| w.bits(r.bits() | to_be_enabled.0));
+        }
+    }
+
+    fn disable_transmission_completed_interrupt(&mut self, to_be_disabled: TxBufferSet) {
+        // Safety: There are no reserved bit patterns.
+        unsafe {
+            self.txbtie()
+                .modify(|r, w| w.bits(r.bits() & !to_be_disabled.0));
+        }
+    }
+
+    fn get_cancellation_flags(&self) -> TxBufferSet {
+        TxBufferSet(self.txbcf().read().bits())
+    }
+
+    fn get_transmission_completed_flags(&self) -> TxBufferSet {
+        TxBufferSet(self.txbto().read().bits())
+    }
+
+    fn iter_cancellation_flags(&self) -> Iter {
+        self.get_cancellation_flags().iter()
+    }
+
+    fn iter_transmission_completed_flags(&self) -> Iter {
+        self.get_transmission_completed_flags().iter()
+    }
+
+    fn cancel_multi(&mut self, to_be_canceled: TxBufferSet) -> nb::Result<(), Infallible> {
         self.poll_canceled(to_be_canceled).or_else(|_| {
             // Safety: There are no reserved bit patterns.
             unsafe {
@@ -253,8 +296,7 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
         })
     }
 
-    /// Request cancellation of a transmit buffer. See [`Self::cancel_multi`].
-    pub fn cancel(&mut self, index: usize) -> nb::Result<(), Infallible> {
+    fn cancel(&mut self, index: usize) -> nb::Result<(), Infallible> {
         self.cancel_multi([index].into_iter().collect())
     }
 }
