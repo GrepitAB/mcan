@@ -9,7 +9,18 @@ use vcell::VolatileCell;
 
 /// Tx specific errors
 pub enum Error {
+    /// Index is out of bounds
     OutOfBounds,
+    /// Support for sending CAN FD messages is disabled
+    ///
+    /// In order to be able to send CAN FD messages change its mode of operation
+    /// to [`Mode::Fd`].
+    FdDisabled,
+    /// Support for sending CAN FD messages with bit rate switching is disabled
+    ///
+    /// In order to be able to send CAN FD messages change its mode of operation
+    /// to [`Mode::Fd { bit_rate_switching: true }`].
+    BitRateSwitchingDisabled,
 }
 
 /// Transmit queue and dedicated buffers
@@ -192,7 +203,7 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
         if self.is_buffer_in_use(index) {
             return Err(nb::Error::WouldBlock);
         }
-        use crate::message::Raw;
+        self.validate_message(&message)?;
         self.memory
             .get_mut(index)
             .ok_or(Error::OutOfBounds)?
@@ -218,6 +229,25 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
         } else {
             Err(nb::Error::WouldBlock)
         }
+    }
+
+    fn validate_message(&self, message: &C::TxMessage) -> Result<(), Error> {
+        use crate::message::Raw;
+        if message.fd_format() && !matches!(self.mode, Mode::Fd { .. }) {
+            return Err(Error::FdDisabled);
+        }
+        if message.bit_rate_switching()
+            && !matches!(
+                self.mode,
+                Mode::Fd {
+                    allow_bit_rate_switching: true,
+                    ..
+                }
+            )
+        {
+            return Err(Error::BitRateSwitchingDisabled);
+        }
+        Ok(())
     }
 }
 
