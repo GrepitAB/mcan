@@ -64,20 +64,20 @@ where
     fn as_tx_builder(&'_ self) -> tx::MessageBuilder<'_> {
         tx::MessageBuilder {
             id: self.id(),
-            frame_contents: if self.is_remote_frame() {
-                tx::FrameContents::Remote {
-                    desired_len: dlc_to_len(self.dlc(), self.fd_format()),
-                }
-            } else {
-                tx::FrameContents::Data(self.data())
-            },
-            frame_format: if self.fd_format() {
-                tx::FrameFormat::FlexibleDatarate {
+            frame_type: if self.fd_format() {
+                tx::FrameType::FlexibleDatarate {
+                    payload: self.data(),
                     bit_rate_switching: self.bit_rate_switching(),
                     force_error_state_indicator: false,
                 }
             } else {
-                tx::FrameFormat::Classic
+                tx::FrameType::Classic(if self.is_remote_frame() {
+                    tx::ClassicFrameType::Remote {
+                        desired_len: dlc_to_len(self.dlc(), self.fd_format()),
+                    }
+                } else {
+                    tx::ClassicFrameType::Data(self.data())
+                })
             },
             store_tx_event: None,
         }

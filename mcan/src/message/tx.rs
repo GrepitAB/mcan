@@ -60,8 +60,8 @@ where
 #[derive(Copy, Clone, Debug)]
 pub struct Message<const N: usize>(pub(super) RawMessage<N>);
 
-/// Selects the type of frame along with contents specific to the frame type.
-pub enum FrameContents<'a> {
+/// Selects the type of the Classic CAN frame.
+pub enum ClassicFrameType<'a> {
     /// May contain data
     Data(&'a [u8]),
     /// Requests transmission of the identified frame
@@ -71,13 +71,15 @@ pub enum FrameContents<'a> {
     },
 }
 
-/// Selects frame format along with configuration specific to the chosen format.
-pub enum FrameFormat {
+/// Selects frame type along with the valid payload type and configuration
+/// specific to the chosen format.
+pub enum FrameType<'a> {
     /// Classic CAN
-    Classic,
+    Classic(ClassicFrameType<'a>),
     /// CAN FD frame. Note that the peripheral must be initialized with CAN FD
     /// enabled to support this format.
     FlexibleDatarate {
+        payload: &'a [u8],
         /// Parts of the frame are transmitted at a higher bit rate. Note that
         /// bit rate switching must be enabled in the peripheral configuration
         /// as well.
@@ -94,10 +96,8 @@ pub enum FrameFormat {
 pub struct MessageBuilder<'a> {
     /// CAN identifier for the frame
     pub id: Id,
-    /// Message contents
-    pub frame_contents: FrameContents<'a>,
-    /// Format selection and format-specific configuration
-    pub frame_format: FrameFormat,
+    /// Message frame type with a payload
+    pub frame_type: FrameType<'a>,
     /// If `Some(marker)`, this message will store an event identified by
     /// `marker` in the TX event queue.
     pub store_tx_event: Option<u8>,
@@ -108,30 +108,40 @@ impl<'a> MessageBuilder<'a> {
     pub fn build<const N: usize>(self) -> Result<Message<N>, TooMuchData> {
         let mut data = [0; N];
 
+        let mut copy_payload = |d: &[u8]| {
+            if d.len() > N {
+                return Err(TooMuchData);
+            }
+            data[..d.len()].copy_from_slice(d);
+            Ok(())
+        };
+
         let id_field = match self.id {
             Id::Standard(id) => (id.as_raw() as u32) << 18,
             Id::Extended(id) => id.as_raw(),
         };
         let xtd = matches!(self.id, Id::Extended(_));
-        let (fdf, brs, esi) = match self.frame_format {
-            FrameFormat::Classic => (false, false, false),
-            FrameFormat::FlexibleDatarate {
+        let (fdf, brs, esi, rtr, len) = match self.frame_type {
+            FrameType::Classic(payload) => {
+                let (rtr, len) = match payload {
+                    ClassicFrameType::Data(payload) => {
+                        copy_payload(payload)?;
+                        (false, payload.len())
+                    }
+                    ClassicFrameType::Remote { desired_len } => (true, desired_len),
+                };
+                (false, false, false, rtr, len)
+            }
+            FrameType::FlexibleDatarate {
+                payload,
                 bit_rate_switching: brs,
                 force_error_state_indicator: esi,
-            } => (true, brs, esi),
-        };
-        let len = match self.frame_contents {
-            FrameContents::Data(d) => {
-                if d.len() > N {
-                    return Err(TooMuchData);
-                }
-                data[..d.len()].copy_from_slice(d);
-                d.len()
+            } => {
+                copy_payload(payload)?;
+                (true, brs, esi, false, payload.len())
             }
-            FrameContents::Remote { desired_len } => desired_len,
         };
         let dlc = len_to_dlc(len, fdf)?;
-        let rtr = matches!(self.frame_contents, FrameContents::Remote { .. });
         let efc = self.store_tx_event.is_some();
         let mm = self.store_tx_event.unwrap_or(0);
 

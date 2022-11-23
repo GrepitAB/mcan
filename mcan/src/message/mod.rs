@@ -57,8 +57,7 @@ impl<const N: usize> Frame for Message<N> {
     fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
         tx::MessageBuilder {
             id: id.into(),
-            frame_contents: tx::FrameContents::Data(data),
-            frame_format: tx::FrameFormat::Classic,
+            frame_type: tx::FrameType::Classic(tx::ClassicFrameType::Data(data)),
             store_tx_event: None,
         }
         .build()
@@ -72,10 +71,9 @@ impl<const N: usize> Frame for Message<N> {
         }
         tx::MessageBuilder {
             id: id.into(),
-            frame_contents: tx::FrameContents::Remote {
+            frame_type: tx::FrameType::Classic(tx::ClassicFrameType::Remote {
                 desired_len: dlc_to_len(dlc as u8, false),
-            },
-            frame_format: tx::FrameFormat::Classic,
+            }),
             store_tx_event: None,
         }
         .build()
