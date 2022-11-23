@@ -1,10 +1,15 @@
+use crate::messageram::Capacities;
 use crate::reg;
-use crate::{bus, messageram::Capacities};
 use core::convert::Infallible;
 use core::marker::PhantomData;
 use generic_array::{typenum::Unsigned, GenericArray};
 use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
+
+/// Tx specific errors
+pub enum Error {
+    OutOfBounds,
+}
 
 /// Transmit queue and dedicated buffers
 pub struct Tx<'a, P, C: Capacities> {
@@ -23,15 +28,12 @@ pub trait DynTx {
     /// Puts a frame in the specified dedicated transmit buffer to be sent on
     /// the bus. Fails with [`nb::Error::WouldBlock`] if the transmit buffer
     /// is full.
-    fn transmit_dedicated(
-        &mut self,
-        index: usize,
-        message: Self::Message,
-    ) -> nb::Result<(), bus::OutOfBounds>;
+    fn transmit_dedicated(&mut self, index: usize, message: Self::Message)
+        -> nb::Result<(), Error>;
 
     /// Puts a frame in the queue to be sent on the bus.
     /// Fails with [`nb::Error::WouldBlock`] if the transmit buffer is full.
-    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), bus::OutOfBounds>;
+    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), Error>;
 
     /// Allow [`Interrupt::TransmissionCancellationFinished`] to be triggered by
     /// `to_be_enabled`. Interrupts for other buffers remain unchanged.
@@ -182,17 +184,14 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
 
     /// Puts a frame in the specified transmit buffer to be sent on the bus.
     /// Fails with [`nb::Error::WouldBlock`] if the transmit buffer is full.
-    fn transmit(
-        &mut self,
-        index: usize,
-        message: C::TxMessage,
-    ) -> nb::Result<(), bus::OutOfBounds> {
+    fn transmit(&mut self, index: usize, message: C::TxMessage) -> nb::Result<(), Error> {
         if self.is_buffer_in_use(index) {
             return Err(nb::Error::WouldBlock);
         }
+        use crate::message::Raw;
         self.memory
             .get_mut(index)
-            .ok_or(bus::OutOfBounds)?
+            .ok_or(Error::OutOfBounds)?
             .set(message);
         self.add_request(index);
         Ok(())
@@ -226,14 +225,14 @@ impl<'a, P: mcan_core::CanId, C: Capacities> DynTx for Tx<'a, P, C> {
         &mut self,
         index: usize,
         message: Self::Message,
-    ) -> nb::Result<(), bus::OutOfBounds> {
+    ) -> nb::Result<(), Error> {
         if index > C::DedicatedTxBuffers::USIZE {
-            Err(bus::OutOfBounds)?;
+            Err(Error::OutOfBounds)?;
         }
         self.transmit(index, message)
     }
 
-    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), bus::OutOfBounds> {
+    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), Error> {
         let index = self.find_put_index().ok_or(nb::Error::WouldBlock)?;
         self.transmit(index, message)
     }

@@ -1,10 +1,13 @@
-use crate::bus;
 use crate::message::rx;
 use crate::reg;
 use core::convert::Infallible;
 use core::marker::PhantomData;
 use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
+
+/// Index is out of bounds
+#[derive(Debug)]
+pub struct OutOfBounds;
 
 /// Dedicated receive buffers on peripheral `P`
 pub struct RxDedicatedBuffer<'a, P, M: rx::AnyMessage> {
@@ -21,7 +24,7 @@ pub trait DynRxDedicatedBuffer {
     type Message;
 
     /// Returns a received frame from the selected buffer if available
-    fn receive(&mut self, index: usize) -> nb::Result<Self::Message, bus::OutOfBounds>;
+    fn receive(&mut self, index: usize) -> nb::Result<Self::Message, OutOfBounds>;
 
     /// Returns a received frame from any dedicated buffer if available
     fn receive_any(&mut self) -> nb::Result<Self::Message, Infallible>;
@@ -67,11 +70,11 @@ impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
         }
     }
 
-    fn has_new_data_checked(&self, index: usize) -> Result<bool, bus::OutOfBounds> {
+    fn has_new_data_checked(&self, index: usize) -> Result<bool, OutOfBounds> {
         if index < 64 {
             Ok(self.has_new_data(index))
         } else {
-            Err(bus::OutOfBounds)
+            Err(OutOfBounds)
         }
     }
 
@@ -87,12 +90,12 @@ impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
         }
     }
 
-    fn peek(&self, index: usize) -> nb::Result<M, bus::OutOfBounds> {
+    fn peek(&self, index: usize) -> nb::Result<M, OutOfBounds> {
         if self.has_new_data_checked(index)? {
             Ok(self
                 .memory
                 .get(index)
-                .ok_or(nb::Error::Other(bus::OutOfBounds))?
+                .ok_or(nb::Error::Other(OutOfBounds))?
                 .get())
         } else {
             Err(nb::Error::WouldBlock)
@@ -106,7 +109,7 @@ impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> DynRxDedicatedBuffer
     type Id = P;
     type Message = M;
 
-    fn receive(&mut self, index: usize) -> nb::Result<Self::Message, bus::OutOfBounds> {
+    fn receive(&mut self, index: usize) -> nb::Result<Self::Message, OutOfBounds> {
         let message = self.peek(index)?;
         self.mark_buffer_read(index);
         Ok(message)

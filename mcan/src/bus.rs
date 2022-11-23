@@ -103,10 +103,6 @@ impl From<BitTimingError> for ConfigurationError {
     }
 }
 
-/// Index is out of bounds
-#[derive(Debug)]
-pub struct OutOfBounds;
-
 /// A CAN bus that is not in configuration mode (CCE=0). Some errors (including
 /// Bus_Off) can asynchronously stop bus operation (INIT=1), which will require
 /// user intervention to reactivate the bus to resume sending and receiving
