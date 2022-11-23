@@ -474,6 +474,8 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         let memory = memory.init();
         Self::apply_ram_config(&reg, memory);
 
+        let config = CanConfig::new(bitrate);
+
         let can = CanConfigurable(Can {
             // Safety: Since `Can::new` takes a PAC singleton, it can only be called once. Then no
             // duplicates will be constructed. The registers that are delegated to these components
@@ -485,12 +487,12 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             rx_dedicated_buffers: unsafe {
                 RxDedicatedBuffer::new(&mut memory.rx_dedicated_buffers)
             },
-            tx: unsafe { Tx::new(&mut memory.tx_buffers) },
+            tx: unsafe { Tx::new(&mut memory.tx_buffers, config.mode) },
             tx_event_fifo: unsafe { TxEventFifo::new(&mut memory.tx_event_fifo) },
             aux: Aux {
                 reg,
                 dependencies,
-                config: CanConfig::new(bitrate),
+                config,
                 // Safety: The memory is zeroed by `memory.init`, so all filters are initially
                 // disabled.
                 filters_standard: unsafe { FiltersStandard::new(&mut memory.filters_standard) },

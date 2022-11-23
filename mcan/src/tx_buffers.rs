@@ -1,3 +1,4 @@
+use crate::config::Mode;
 use crate::messageram::Capacities;
 use crate::reg;
 use core::convert::Infallible;
@@ -14,6 +15,7 @@ pub enum Error {
 /// Transmit queue and dedicated buffers
 pub struct Tx<'a, P, C: Capacities> {
     memory: &'a mut GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
+    mode: Mode,
     _markers: PhantomData<P>,
 }
 
@@ -114,9 +116,11 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
     /// - TXBCIE
     pub(crate) unsafe fn new(
         memory: &'a mut GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
+        mode: Mode,
     ) -> Self {
         Self {
             memory,
+            mode,
             _markers: PhantomData,
         }
     }
