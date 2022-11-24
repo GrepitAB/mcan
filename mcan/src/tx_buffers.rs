@@ -8,6 +8,7 @@ use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
 
 /// Tx specific errors
+#[derive(Debug)]
 pub enum Error {
     /// Index is out of bounds
     OutOfBounds,
