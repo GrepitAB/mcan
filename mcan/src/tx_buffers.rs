@@ -1,14 +1,32 @@
+use crate::config::Mode;
+use crate::messageram::Capacities;
 use crate::reg;
-use crate::{bus, messageram::Capacities};
 use core::convert::Infallible;
 use core::marker::PhantomData;
 use generic_array::{typenum::Unsigned, GenericArray};
 use reg::AccessRegisterBlock as _;
 use vcell::VolatileCell;
 
+/// Tx specific errors
+pub enum Error {
+    /// Index is out of bounds
+    OutOfBounds,
+    /// Support for sending CAN FD messages is disabled
+    ///
+    /// In order to be able to send CAN FD messages change its mode of operation
+    /// to [`Mode::Fd`].
+    FdDisabled,
+    /// Support for sending CAN FD messages with bit rate switching is disabled
+    ///
+    /// In order to be able to send CAN FD messages change its mode of operation
+    /// to [`Mode::Fd { bit_rate_switching: true }`].
+    BitRateSwitchingDisabled,
+}
+
 /// Transmit queue and dedicated buffers
 pub struct Tx<'a, P, C: Capacities> {
     memory: &'a mut GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
+    mode: Mode,
     _markers: PhantomData<P>,
 }
 
@@ -23,15 +41,12 @@ pub trait DynTx {
     /// Puts a frame in the specified dedicated transmit buffer to be sent on
     /// the bus. Fails with [`nb::Error::WouldBlock`] if the transmit buffer
     /// is full.
-    fn transmit_dedicated(
-        &mut self,
-        index: usize,
-        message: Self::Message,
-    ) -> nb::Result<(), bus::OutOfBounds>;
+    fn transmit_dedicated(&mut self, index: usize, message: Self::Message)
+        -> nb::Result<(), Error>;
 
     /// Puts a frame in the queue to be sent on the bus.
     /// Fails with [`nb::Error::WouldBlock`] if the transmit buffer is full.
-    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), bus::OutOfBounds>;
+    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), Error>;
 
     /// Allow [`Interrupt::TransmissionCancellationFinished`] to be triggered by
     /// `to_be_enabled`. Interrupts for other buffers remain unchanged.
@@ -112,9 +127,11 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
     /// - TXBCIE
     pub(crate) unsafe fn new(
         memory: &'a mut GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
+        mode: Mode,
     ) -> Self {
         Self {
             memory,
+            mode,
             _markers: PhantomData,
         }
     }
@@ -182,17 +199,14 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
 
     /// Puts a frame in the specified transmit buffer to be sent on the bus.
     /// Fails with [`nb::Error::WouldBlock`] if the transmit buffer is full.
-    fn transmit(
-        &mut self,
-        index: usize,
-        message: C::TxMessage,
-    ) -> nb::Result<(), bus::OutOfBounds> {
+    fn transmit(&mut self, index: usize, message: C::TxMessage) -> nb::Result<(), Error> {
         if self.is_buffer_in_use(index) {
             return Err(nb::Error::WouldBlock);
         }
+        self.validate_message(&message)?;
         self.memory
             .get_mut(index)
-            .ok_or(bus::OutOfBounds)?
+            .ok_or(Error::OutOfBounds)?
             .set(message);
         self.add_request(index);
         Ok(())
@@ -216,6 +230,25 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
             Err(nb::Error::WouldBlock)
         }
     }
+
+    fn validate_message(&self, message: &C::TxMessage) -> Result<(), Error> {
+        use crate::message::Raw;
+        if message.fd_format() && !matches!(self.mode, Mode::Fd { .. }) {
+            return Err(Error::FdDisabled);
+        }
+        if message.bit_rate_switching()
+            && !matches!(
+                self.mode,
+                Mode::Fd {
+                    allow_bit_rate_switching: true,
+                    ..
+                }
+            )
+        {
+            return Err(Error::BitRateSwitchingDisabled);
+        }
+        Ok(())
+    }
 }
 
 impl<'a, P: mcan_core::CanId, C: Capacities> DynTx for Tx<'a, P, C> {
@@ -226,14 +259,14 @@ impl<'a, P: mcan_core::CanId, C: Capacities> DynTx for Tx<'a, P, C> {
         &mut self,
         index: usize,
         message: Self::Message,
-    ) -> nb::Result<(), bus::OutOfBounds> {
+    ) -> nb::Result<(), Error> {
         if index > C::DedicatedTxBuffers::USIZE {
-            Err(bus::OutOfBounds)?;
+            Err(Error::OutOfBounds)?;
         }
         self.transmit(index, message)
     }
 
-    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), bus::OutOfBounds> {
+    fn transmit_queued(&mut self, message: Self::Message) -> nb::Result<(), Error> {
         let index = self.find_put_index().ok_or(nb::Error::WouldBlock)?;
         self.transmit(index, message)
     }
