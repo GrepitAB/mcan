@@ -8,9 +8,6 @@ use generic_array::{
 };
 use vcell::VolatileCell;
 
-/// Start of addressable RAM
-pub const SYSTEM_RAM: usize = 0x2000_0000;
-
 /// Element capacities
 pub trait Capacities {
     /// Maximum number of Standard ID filters
@@ -83,9 +80,13 @@ impl<C: Capacities> SharedMemory<C> {
     /// The peripheral uses 16-bit addressing for its memory configuration,
     /// offset from the start of system RAM. If `SharedMemory` is allocated
     /// outside the addressable region, it cannot be used.
-    pub fn is_addressable(&self) -> bool {
+    pub(crate) fn is_addressable(&self, eligible_message_ram_start: *const ()) -> bool {
+        // TODO: We should have a safety guarantee from
+        // `mcan_core::Dependencies::eligible_message_ram_start` implementor, so maybe
+        // this is too defensive
+        let eligible_message_ram_start = eligible_message_ram_start as usize & !(u16::MAX as usize);
         let start = self as *const _ as usize;
         let end_exclusive = start + core::mem::size_of::<Self>();
-        SYSTEM_RAM <= start && end_exclusive - SYSTEM_RAM <= 1 << 16
+        eligible_message_ram_start <= start && end_exclusive - eligible_message_ram_start <= 1 << 16
     }
 }

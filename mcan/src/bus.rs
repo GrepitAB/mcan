@@ -467,7 +467,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
 
         reg.configuration_mode();
 
-        if !memory.is_addressable() {
+        if !memory.is_addressable(dependencies.eligible_message_ram_start()) {
             return Err(MemoryNotAddressableError);
         }
 
