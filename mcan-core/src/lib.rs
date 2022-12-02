@@ -210,6 +210,10 @@ pub unsafe trait CanId {
 ///     TX: TxPin<ValidFor = ID>,
 ///     CAN: OwnedPeripheral<Represents = ID>,
 /// {
+///     fn message_ram(&self) -> *const () {
+///         0x2000_0000 as _
+///     }
+///
 ///     fn host_clock(&self) -> HertzU32 {
 ///         self.host_clock_token.frequency()
 ///     }
@@ -262,6 +266,14 @@ pub unsafe trait CanId {
 ///
 /// [`mcan`]: <https://docs.rs/crate/mcan/>
 pub unsafe trait Dependencies<Id: CanId> {
+    /// Pointer to the `Message RAM`.
+    ///
+    /// Only 2 most significant bytes are relevant.
+    ///
+    /// MCAN uses 16-bit addressing internally. In order to validate the
+    /// correctness of the `Message RAM` placement, target HAL has to provide
+    /// the information about its absolute position in RAM.
+    fn message_ram(&self) -> *const ();
     /// Frequency of the host / main / CPU clock.
     ///
     /// MCAN uses the host clock for most of its internal operations and its
