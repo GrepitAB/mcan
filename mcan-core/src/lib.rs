@@ -75,6 +75,8 @@ pub unsafe trait CanId {
 ///
 /// # Safety
 /// While the [`Dependencies`] type instance exists
+/// - Start address of the eligible memory region for `Message RAM` allocation
+///   must not change
 /// - CAN related clocks must not change
 /// - CAN related pins modes must not change
 /// - The HW register must be neither safely accessible by the application
