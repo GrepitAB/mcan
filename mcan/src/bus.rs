@@ -467,6 +467,10 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
 
         reg.configuration_mode();
 
+        // Contract:
+        // `mcan_core::Dependencies::eligible_message_ram_start` contract guarantees
+        // `u16::MAX + 1` alignment and points to the beginning of the allocatable CAN
+        // memory region.
         if !memory.is_addressable(dependencies.eligible_message_ram_start()) {
             return Err(MemoryNotAddressableError);
         }

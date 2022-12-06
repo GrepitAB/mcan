@@ -81,10 +81,7 @@ impl<C: Capacities> SharedMemory<C> {
     /// offset from the start of system RAM. If `SharedMemory` is allocated
     /// outside the addressable region, it cannot be used.
     pub(crate) fn is_addressable(&self, eligible_message_ram_start: *const ()) -> bool {
-        // TODO: We should have a safety guarantee from
-        // `mcan_core::Dependencies::eligible_message_ram_start` implementor, so maybe
-        // this is too defensive
-        let eligible_message_ram_start = eligible_message_ram_start as usize & !(u16::MAX as usize);
+        let eligible_message_ram_start = eligible_message_ram_start as usize;
         let start = self as *const _ as usize;
         let end_exclusive = start + core::mem::size_of::<Self>();
         eligible_message_ram_start <= start && end_exclusive - eligible_message_ram_start <= 1 << 16
