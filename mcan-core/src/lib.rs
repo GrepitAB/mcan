@@ -270,7 +270,8 @@ pub unsafe trait CanId {
 pub unsafe trait Dependencies<Id: CanId> {
     /// Pointer to the start of memory that can be used for `Message RAM`.
     ///
-    /// Only 2 most significant bytes are relevant.
+    /// The two least significant bytes must be zero, or in other words, the
+    /// address must be aligned to `u16::MAX + 1`.
     ///
     /// MCAN uses 16-bit addressing internally. In order to validate the
     /// correctness of the `Message RAM` placement, the target HAL has to
