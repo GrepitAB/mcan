@@ -75,6 +75,8 @@ pub unsafe trait CanId {
 ///
 /// # Safety
 /// While the [`Dependencies`] type instance exists
+/// - Start address of the eligible memory region for `Message RAM` allocation
+///   must not change
 /// - CAN related clocks must not change
 /// - CAN related pins modes must not change
 /// - The HW register must be neither safely accessible by the application
@@ -268,7 +270,8 @@ pub unsafe trait CanId {
 pub unsafe trait Dependencies<Id: CanId> {
     /// Pointer to the start of memory that can be used for `Message RAM`.
     ///
-    /// Only 2 most significant bytes are relevant.
+    /// The two least significant bytes must be zero, or in other words, the
+    /// address must be aligned to `u16::MAX + 1`.
     ///
     /// MCAN uses 16-bit addressing internally. In order to validate the
     /// correctness of the `Message RAM` placement, the target HAL has to
