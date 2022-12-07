@@ -11,7 +11,7 @@ documentation = "https://docs.rs/crate/mcan/"
 readme = "../README.md"
 
 [dependencies]
-mcan-core = "0.1"
+mcan-core = "0.2"
 bitfield = "0.14"
 embedded-can = "0.4"
 fugit = "0.3.5"
