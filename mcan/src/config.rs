@@ -107,11 +107,25 @@ impl Default for Timestamp {
 /// Misconfigurations of [`BitTiming`].
 #[derive(Debug)]
 pub enum BitTimingError {
-    SynchronizationJumpWidth(RangeInclusive<u32>),
-    PhaseSeg1(RangeInclusive<u32>),
-    PhaseSeg2(RangeInclusive<u32>),
-    BitTime(RangeInclusive<u32>),
-    NoValidPrescaler,
+    /// SJW is out of range
+    SynchronizationJumpWidthOutOfRange(RangeInclusive<u32>),
+    /// Phase segment 1 is out of range
+    PhaseSeg1OutOfRange(RangeInclusive<u32>),
+    /// Phase segment 2 is out of range
+    PhaseSeg2OutOfRange(RangeInclusive<u32>),
+    /// Total bit time quanta is out of range
+    BitTimeOutOfRange(RangeInclusive<u32>),
+    /// Prescaler is out of range
+    PrescalerOutOfRange(RangeInclusive<u32>),
+    /// No valid prescaler could be found
+    ///
+    /// Following requirement must be met:
+    /// - `can_clock` must be divisible by `bitrate * bit_time_quanta`
+    NoValidPrescaler {
+        can_clock: HertzU32,
+        bitrate: HertzU32,
+        bit_time_quanta: u32,
+    },
 }
 
 /// Valid values of a BitTiming struct
@@ -148,16 +162,24 @@ impl BitTiming {
 
     fn check(&self, valid: &BitTimingRanges) -> Result<(), BitTimingError> {
         if !valid.sjw.contains(&self.sjw.into()) {
-            Err(BitTimingError::SynchronizationJumpWidth(valid.sjw.clone()))
+            Err(BitTimingError::SynchronizationJumpWidthOutOfRange(
+                valid.sjw.clone(),
+            ))
         } else if !valid.phase_seg_1.contains(&self.phase_seg_1.into()) {
-            Err(BitTimingError::PhaseSeg1(valid.phase_seg_1.clone()))
+            Err(BitTimingError::PhaseSeg1OutOfRange(
+                valid.phase_seg_1.clone(),
+            ))
         } else if !valid.phase_seg_2.contains(&self.phase_seg_2.into()) {
-            Err(BitTimingError::PhaseSeg2(valid.phase_seg_2.clone()))
+            Err(BitTimingError::PhaseSeg2OutOfRange(
+                valid.phase_seg_2.clone(),
+            ))
         } else if !valid
             .time_quanta_per_bit
             .contains(&self.time_quanta_per_bit())
         {
-            Err(BitTimingError::BitTime(valid.time_quanta_per_bit.clone()))
+            Err(BitTimingError::BitTimeOutOfRange(
+                valid.time_quanta_per_bit.clone(),
+            ))
         } else {
             Ok(())
         }
@@ -170,16 +192,21 @@ impl BitTiming {
     ) -> Result<u16, BitTimingError> {
         self.check(valid)?;
         let f_out = self.bitrate;
-        let f_q = f_out * self.time_quanta_per_bit();
+        let bit_time_quanta = self.time_quanta_per_bit();
+        let f_q = f_out * bit_time_quanta;
         if let Some(0) = f_can.to_Hz().checked_rem(f_q.to_Hz()) {
             let prescaler = f_can / f_q;
             if !valid.prescaler.contains(&prescaler) {
-                Err(BitTimingError::NoValidPrescaler)
+                Err(BitTimingError::PrescalerOutOfRange(valid.prescaler.clone()))
             } else {
                 Ok(prescaler as u16)
             }
         } else {
-            Err(BitTimingError::NoValidPrescaler)
+            Err(BitTimingError::NoValidPrescaler {
+                can_clock: f_can,
+                bitrate: f_out,
+                bit_time_quanta,
+            })
         }
     }
 }
