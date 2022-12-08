@@ -71,7 +71,11 @@ pub struct BitTiming {
 }
 
 impl BitTiming {
-    fn new(bitrate: HertzU32) -> Self {
+    /// Create an instance
+    ///
+    /// Nominal bitrate value must be provided, all other settings come
+    /// pre-populated with default values.
+    pub fn new(bitrate: HertzU32) -> Self {
         Self {
             // Note: SWJ and {N,D}TSEG{1,2} defaults come from reset values
             sjw: 0x4,
@@ -199,7 +203,11 @@ pub enum Mode {
 }
 
 impl CanConfig {
-    pub(crate) fn new(bitrate: HertzU32) -> Self {
+    /// Create an instance
+    ///
+    /// Nominal bitrate value must be provided, all other settings come
+    /// pre-populated with default values.
+    pub fn new(bitrate: HertzU32) -> Self {
         Self {
             mode: Default::default(),
             loopback: Default::default(),
