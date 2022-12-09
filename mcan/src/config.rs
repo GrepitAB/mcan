@@ -222,6 +222,11 @@ pub enum Mode {
     /// data) is enabled. This does not prevent use of classic CAN frames.
     Fd {
         /// If `true`, FD frames can be transmitted with bit rate switching.
+        /// Otherwise, attempts to transmit FD frames will return errors.
+        ///
+        /// Regardless of this setting, data phase timing still must be
+        /// configured as *reception* of bit-rate-switched messages is still
+        /// possible.
         allow_bit_rate_switching: bool,
         /// Bit timing parameters for the data phase of bit rate switched FD
         /// frames.
