@@ -289,6 +289,8 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
                 });
             }
         };
+        // Repopulate mode configuration in `tx`
+        self.0.tx.mode = config.mode;
 
         // Global filter configuration
         // This setting is redundant and the same behaviour is achievable through main
