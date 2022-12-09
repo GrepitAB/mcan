@@ -27,7 +27,7 @@ pub enum Error {
 /// Transmit queue and dedicated buffers
 pub struct Tx<'a, P, C: Capacities> {
     memory: &'a mut GenericArray<VolatileCell<C::TxMessage>, C::TxBuffers>,
-    mode: Mode,
+    pub(crate) mode: Mode,
     _markers: PhantomData<P>,
 }
 
