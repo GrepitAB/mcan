@@ -107,19 +107,19 @@ impl Default for Timestamp {
 /// Misconfigurations of [`BitTiming`].
 #[derive(Debug)]
 pub enum BitTimingError {
-    /// SJW is out of range
+    /// SJW is outside the wrapped `RangeInclusive`
     SynchronizationJumpWidthOutOfRange(RangeInclusive<u32>),
-    /// Phase segment 1 is out of range
+    /// Phase segment 1 is outside the wrapped `RangeInclusive`
     PhaseSeg1OutOfRange(RangeInclusive<u32>),
-    /// Phase segment 2 is out of range
+    /// Phase segment 2 is outside the wrapped `RangeInclusive`
     PhaseSeg2OutOfRange(RangeInclusive<u32>),
-    /// Total bit time quanta is out of range
+    /// Total bit time quanta is outside the wrapped `RangeInclusive`
     BitTimeOutOfRange(RangeInclusive<u32>),
-    /// Prescaler is out of range
+    /// Prescaler is outside the wrapped `RangeInclusive`
     PrescalerOutOfRange(RangeInclusive<u32>),
     /// No valid prescaler could be found
     ///
-    /// Following requirement must be met:
+    /// The following requirement must be met:
     /// - `can_clock` must be divisible by `bitrate * bit_time_quanta`
     NoValidPrescaler {
         can_clock: HertzU32,
