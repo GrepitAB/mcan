@@ -1,3 +1,9 @@
+//! Queues for received messages
+//!
+//! Messages can be placed in the queues by filter [`Action`]s.
+//!
+//! [`Action`]: crate::filter::Action
+
 use crate::message::rx;
 use crate::reg;
 use core::convert::Infallible;

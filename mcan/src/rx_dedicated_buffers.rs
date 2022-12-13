@@ -1,3 +1,11 @@
+//! Individually indexed receive buffers
+//!
+//! Messages can be placed in dedicated buffers by [`Filter::StoreBuffer`] or
+//! [`ExtFilter::StoreBuffer`].
+//!
+//! [`Filter::StoreBuffer`]: crate::filter::Filter::StoreBuffer
+//! [`ExtFilter::StoreBuffer`]: crate::filter::ExtFilter::StoreBuffer
+
 use crate::message::rx;
 use crate::reg;
 use core::convert::Infallible;

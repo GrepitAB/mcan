@@ -103,18 +103,25 @@ impl From<BitTimingError> for ConfigurationError {
     }
 }
 
-/// A CAN bus that is not in configuration mode (CCE=0). Some errors (including
-/// Bus_Off) can asynchronously stop bus operation (INIT=1), which will require
-/// user intervention to reactivate the bus to resume sending and receiving
-/// messages.
+/// A CAN bus that is not in configuration mode (CCE=0)
+///
+/// Some errors (including Bus_Off) can asynchronously stop bus operation
+/// (INIT=1), which will require user intervention to reactivate the bus to
+/// resume sending and receiving messages.
 pub struct Can<'a, Id, D, C: Capacities> {
     /// Controls enabling and line selection of interrupts.
     pub interrupts: InterruptConfiguration<Id>,
+    /// Receive FIFO 0
     pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0Message>,
+    /// Receive FIFO 1
     pub rx_fifo_1: RxFifo<'a, Fifo1, Id, C::RxFifo1Message>,
+    /// Dedicated receive buffers
     pub rx_dedicated_buffers: RxDedicatedBuffer<'a, Id, C::RxBufferMessage>,
+    /// Message transmission
     pub tx: Tx<'a, Id, C>,
+    /// Events for successfully transmitted messages
     pub tx_event_fifo: TxEventFifo<'a, Id>,
+    /// Auxiliary bits and bobs
     pub aux: Aux<'a, Id, D>,
 }
 
@@ -124,9 +131,15 @@ pub struct Can<'a, Id, D, C: Capacities> {
 pub struct Aux<'a, Id, D> {
     /// CAN bus peripheral
     reg: crate::reg::Can<Id>,
+    /// [`Dependencies`] held for the target HAL
+    ///
+    /// [`Dependencies`]: mcan_core::Dependencies
     dependencies: D,
+    /// Configuration
     config: CanConfig,
+    /// Filters for messages with [`embedded_can::StandardId`]s
     filters_standard: FiltersStandard<'a, Id>,
+    /// Filters for messages with [`embedded_can::ExtendedId`]s
     filters_extended: FiltersExtended<'a, Id>,
 }
 
@@ -532,6 +545,9 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Ca
         &self.aux.reg
     }
 
+    /// Return to configuration mode. This resets some status registers, which
+    /// effectively clears received messages, messages pending transmission and
+    /// tranmit events.
     pub fn configure(self) -> CanConfigurable<'a, Id, D, C> {
         self.aux.configuration_mode();
         CanConfigurable(self)

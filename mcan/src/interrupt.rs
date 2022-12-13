@@ -1,3 +1,60 @@
+//! Interrupt configuration and access.
+//!
+//! Interrupts are configured by accessing the [`InterruptConfiguration`] during
+//! initialization through [`CanConfigurable::interrupts`] or at runtime through
+//! [`Can::interrupts`].
+//!
+//! ```no_run
+//! # use mcan::bus::Can;
+//! # use mcan::core::CanId;
+//! # use mcan::generic_array::typenum::consts::*;
+//! # use mcan::messageram::Capacities;
+//! # use mcan::message::{tx,rx};
+//! # use mcan::prelude::*;
+//! # struct Can0;
+//! # unsafe impl CanId for Can0 {
+//! #     const ADDRESS: *const () = 0xDEAD0000 as *const _;
+//! # }
+//! # struct Caps;
+//! # impl Capacities for Caps {
+//! #     type StandardFilters = U128;
+//! #     type ExtendedFilters = U64;
+//! #     type RxBufferMessage = rx::Message<64>;
+//! #     type DedicatedRxBuffers = U64;
+//! #     type RxFifo0Message = rx::Message<64>;
+//! #     type RxFifo0 = U64;
+//! #     type RxFifo1Message = rx::Message<64>;
+//! #     type RxFifo1 = U64;
+//! #     type TxMessage = tx::Message<64>;
+//! #     type TxBuffers = U32;
+//! #     type DedicatedTxBuffers = U0;
+//! #     type TxEventFifo = U32;
+//! # }
+//! # let mut can: Can<'static, Can0, (), Caps> = unsafe { std::mem::transmute([0u8; 176]) };
+//! use mcan::interrupt::{Interrupt, InterruptLine};
+//! // During initialization
+//! let desired_interrupts = [Interrupt::BusOff, Interrupt::RxFifo0NewMessage];
+//! let enabled_interrupts = can.interrupts.enable(
+//!     desired_interrupts.iter().copied().collect(),
+//!     InterruptLine::Line0
+//! ).unwrap();
+//!
+//! // When an interrupt arrives
+//! for interrupt in enabled_interrupts.iter_flagged() {
+//!     match interrupt {
+//!         Interrupt::BusOff => {
+//!             // ...
+//!         }
+//!         Interrupt::RxFifo0NewMessage => {
+//!             // ...
+//!         }
+//!         _ => (),
+//!     }
+//! }
+//! ```
+//!
+//! [`Can::interrupts`]: crate::bus::Can::interrupts
+//! [`CanConfigurable::interrupts`]: crate::bus::Can::interrupts
 use crate::reg;
 use bitfield::bitfield;
 use core::marker::PhantomData;
@@ -266,6 +323,7 @@ impl From<Interrupt> for u32 {
     }
 }
 
+/// No interrupt with that number exists
 pub struct InvalidInterruptNumber;
 
 impl TryFrom<u8> for Interrupt {

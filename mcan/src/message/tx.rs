@@ -62,7 +62,7 @@ pub struct Message<const N: usize>(pub(super) RawMessage<N>);
 
 /// Selects the type of the Classic CAN frame.
 pub enum ClassicFrameType<'a> {
-    /// May contain data
+    /// 0-8 byte message payload
     Data(&'a [u8]),
     /// Requests transmission of the identified frame
     Remote {
@@ -79,6 +79,10 @@ pub enum FrameType<'a> {
     /// CAN FD frame. Note that the peripheral must be initialized with CAN FD
     /// enabled to support this format.
     FlexibleDatarate {
+        /// 0-64 byte message payload. The payload must not be bigger than the
+        /// maximum payload size chosen in [`Capacities::TxMessage`].
+        ///
+        /// [`Capacities::TxMessage`]: crate::messageram::Capacities
         payload: &'a [u8],
         /// Parts of the frame are transmitted at a higher bit rate. Note that
         /// bit rate switching must be enabled in the peripheral configuration

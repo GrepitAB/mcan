@@ -86,11 +86,12 @@ impl BitTiming {
     }
 }
 
+/// Timestamp counter configuration
 #[derive(Copy, Clone)]
 pub struct Timestamp {
     /// Counting mode of time stamp timer
     pub select: TimeStampSelect,
-    /// Time stamp timer prescaler, bittimes per tic
+    /// Time stamp timer prescaler, bit times per tick
     /// Valid values are: 1 <= ts_prescale <= 16
     pub prescaler: u8,
 }
@@ -122,8 +123,11 @@ pub enum BitTimingError {
     /// The following requirement must be met:
     /// - `can_clock` must be divisible by `bitrate * bit_time_quanta`
     NoValidPrescaler {
+        /// Provided peripheral clock
         can_clock: HertzU32,
+        /// Bitrate requested in [`BitTiming`]
         bitrate: HertzU32,
+        /// Time quanta per bit selected by [`BitTiming`]
         bit_time_quanta: u32,
     },
 }
@@ -337,7 +341,8 @@ pub enum TxQueueMode {
     /// Messages are sent according to their priority
     ///
     /// Lower ID means higher priority. Messages of the same ID are sent in an
-    /// arbitrary order.
+    /// arbitrary order. This is the same order as arbitration on the bus would
+    /// give.
     Priority,
 }
 

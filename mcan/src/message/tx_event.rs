@@ -38,18 +38,31 @@ impl Raw for TxEvent {
 pub struct TxEvent(pub(super) RawMessage<0>);
 
 impl TxEvent {
+    /// Returns the message marker that was set in [`store_tx_event`]
+    ///
+    /// [`store_tx_event`]: crate::message::tx::MessageBuilder::store_tx_event
     pub fn message_marker(&self) -> u8 {
         (self.0.header[1] >> 24) as u8
     }
 
+    /// Parse the event type field. Indicates whether cancellation was requested
+    /// at the time transmission succeeded.
     pub fn event_type(&self) -> TxEventType {
         TxEventType::from((self.0.header[1] >> 22) & 3)
     }
 }
 
+/// Indicates whether cancellation was requested at the time transmission
+/// succeeded
 pub enum TxEventType {
+    /// Unrecognized field value
     Reserved,
+    /// Transmission was successful
     TxEvent = 1,
+    /// Transmission was successful AND cancellation was requested
+    ///
+    /// This can happen if transmission had already started when the
+    /// cancellation request was made.
     TxInSpiteOfCancellation = 2,
 }
 

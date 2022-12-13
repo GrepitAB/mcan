@@ -1,3 +1,8 @@
+//! Information about successfully transmitted messages
+//!
+//! Events are only generated for messages with [`store_tx_event`] set.
+//!
+//! [`store_tx_event`]: crate::message::tx::MessageBuilder::store_tx_event
 use crate::message::TxEvent;
 use crate::reg;
 use core::marker::PhantomData;
