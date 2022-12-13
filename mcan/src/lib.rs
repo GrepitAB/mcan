@@ -16,6 +16,8 @@ pub mod tx_buffers;
 pub mod tx_event_fifo;
 
 pub use embedded_can;
+pub use generic_array;
+pub use mcan_core as core;
 
 // For svd2rust generated code that refers to everything via `crate::...`
 use reg::generic::*;
