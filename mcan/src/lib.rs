@@ -28,32 +28,35 @@
 //! requirements of [`mcan_core`] traits which platform-specific HALs are
 //! expected to implement.
 //!
-//! As a result, application developer, in order to instantiate
-//! [`CanConfigurable`] an instance of a [`mcan_core::Dependencies`]
-//! implementing struct is required and according to the safety requirements of
-//! the latter, MCAN prerequisites should be upheld for as long as it exists.
+//! In order to use MCAN, one has to instantiate [`CanConfigurable`] and
+//! [`finalize`] it. Its constructor requires an instance of an
+//! [`Dependencies`] implementing struct and holds onto it until it's
+//! [`freed`]. Safety requirements of the `Dependencies` trait
+//! guarantee a correct state of MCAN interfaces during its operation.
+//!
+//! TODO: We do not have `CanConfigurable::free`??
 //!
 //! ## Message RAM Configuration
 //!
-//! All platform specific details are covered by
-//! [`mcan_core::Dependencies`] **apart from** the Message RAM configuration.
-//! This is because it is hard to enclose all safety requirements for shared
-//! message RAM on a platform-specific HAL level.
+//! All the platform specific details are covered by
+//! `Dependencies` **apart from** the Message RAM configuration.
+//! This is because it is hard to enclose all the safety requirements for the
+//! shared message RAM on a platform-specific HAL level.
 //!
-//! MCAN uses 16-bit addressing internally. It means that all higher bytes of
-//! the addressing has to be configured externally to MCAN HAL.
-//! [`mcan_core::Dependencies::eligible_message_ram_start`] implemented by
+//! The MCAN uses 16-bit addressing internally. It means that all higher bytes
+//! of the addressing has to be configured externally to the MCAN HAL.
+//! [`Dependencies::eligible_message_ram_start`] implemented by
 //! platform-specific HAL provides a way to `mcan` to verify if the memory
 //! region provided by a user is sound; yet it is up to the user to put it in a
 //! valid, accessible to MCAN, RAM memory region.
 //!
-//! Standard way of configuring Message RAM would be to
-//! - specify custom MEMORY entry in a linker script mapped to valid RAM memory
-//!   region
-//! - introduce custom, `.bss` like (NOLOAD property), section - eg. `.can`
-//! - map new custom input section to new custom MEMORY entry
-//! - use `#[link_section]` attribute in a code to link static variable to this
+//! One can configure the Message RAM as follows
+//! - specify a custom MEMORY entry in a linker script mapped to the valid RAM
 //!   memory region
+//! - introduce a custom, `.bss` like (NOLOAD property), section - eg. `.can`
+//! - map a new custom input section to a new custom MEMORY entry
+//! - use the `#[link_section]` attribute in a code to link a static variable to
+//!   this memory region
 //!
 //! Example of a linker script
 //! ```text
@@ -99,10 +102,11 @@
 //! static mut MESSAGE_RAM: SharedMemory<Capacities> = SharedMemory::new();
 //! ```
 //!
-//! When it comes to [`RTIC`] framework, suggested way of setting the shared
+//! When it comes to the [`RTIC`] framework, suggested way of setting the shared
 //! memory up would be to use task-local resource in an `init` task. Reference
 //! to a task-local resource in an `init` has a static lifetime which is
-//! suitable for configuring MCAN returning it from `init`.
+//! suitable for configuring MCAN and returning it from `init`. It allows a user
+//! to avoid the unsafe memory access to a static variable.
 //!
 //! ```ignore
 //! #[rtic::app(device = hal::pac, peripherals = true, dispatchers = [SOME_DISPATCHER])]
@@ -120,9 +124,11 @@
 //!
 //! ## General usage example
 //!
-//! In order to use MCAN abstractions one has to
-//! - instantiate [`mcan_core::Dependencies`] implementing struct
-//! - setup message RAM
+//! In order to use the MCAN abstractions one shall
+//! - instantiate an `Dependencies` implementing struct
+//! - setup the Message RAM
+//!     - implement [`Capacities`] trait on a marker type
+//!     - allocate the memory via [`SharedMemory`] type
 //!
 //! ```no_run
 //! # use mcan::generic_array::typenum::consts::*;
@@ -246,6 +252,11 @@
 //!
 //! [`RTIC`]: https://rtic.rs
 //! [`CanConfigurable`]: crate::bus::CanConfigurable
+//! [`finalize`]: crate::bus::CanConfigurable::finalize
+//! [`free`]: crate::bus::CanConfigurable::free
+//! [`Dependencies`]: mcan_core::Dependencies
+//! [`Dependencies::eligible_message_ram_start`]: mcan_core::Dependencies::eligible_message_ram_start
+//! [`Capacities`]: crate::messageram::Capacities
 //! [`SharedMemory`]: crate::messageram::SharedMemory
 
 pub mod bus;
