@@ -1,3 +1,4 @@
+//! Register access helpers
 use core::marker;
 #[doc = " Raw register type"]
 pub trait RegisterSpec {

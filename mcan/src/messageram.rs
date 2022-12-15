@@ -71,7 +71,7 @@ impl<C: Capacities> SharedMemory<C> {
     }
 
     /// All initialization is handled by the type that uses the memory, so this
-    /// type can safely be assigned to a link_section that is not
+    /// type can safely be assigned to a `link_section` that is not
     /// initialized by the system to control its position in memory.
     pub const fn new() -> Self {
         Self(MaybeUninit::uninit())

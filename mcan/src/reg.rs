@@ -1,3 +1,5 @@
+//! Low-level access to peripheral registers
+
 #![allow(non_camel_case_types)]
 pub mod generic;
 
@@ -7,6 +9,7 @@ pub mod generic;
 /// This is necessary, as [`mcan_core::CanId`] and [`mcan_core`] itself does not
 /// know the concrete low-level access type definition.
 pub trait AccessRegisterBlock {
+    /// Returns a raw pointer to the peripheral registers
     fn register_block() -> *const RegisterBlock;
 }
 
@@ -16,6 +19,7 @@ impl<T: mcan_core::CanId> AccessRegisterBlock for T {
     }
 }
 
+/// Provides raw register access
 pub struct Can<Id>(core::marker::PhantomData<(*const (), Id)>);
 
 unsafe impl<Id> Send for Can<Id> {}
@@ -158,6 +162,7 @@ pub struct RegisterBlock {
     pub txefa: crate::Reg<txefa::TXEFA_SPEC>,
 }
 
+/// Group of receive FIFO registers
 #[repr(C)]
 pub struct RxFifoRegs {
     #[doc = "Rx FIFO Configuration"]

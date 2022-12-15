@@ -1,3 +1,11 @@
+//! Holds messages pending transmission
+//!
+//! There are two kinds of transmit buffers: dedicated transmit buffers and a
+//! transmit queue. Dedicated transmit buffers are individually indexed, leaving
+//! it up to the user to find unused spots for new transmit requests. The queue
+//! automatically selects where new messages are placed. The ordering of the
+//! queue is configurable; see [`crate::config::TxQueueMode`].
+
 use crate::config::Mode;
 use crate::messageram::Capacities;
 use crate::reg;

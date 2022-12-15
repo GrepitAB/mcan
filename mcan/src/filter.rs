@@ -3,10 +3,13 @@ use core::marker::PhantomData;
 use embedded_can::{ExtendedId, StandardId};
 use vcell::VolatileCell;
 
+/// Acceptance filters for incoming messages with [`StandardId`]
 pub type FiltersStandard<'a, P> = Filters<'a, P, FilterStandardId>;
+/// Acceptance filters for incoming messages with [`ExtendedId`]
 pub type FiltersExtended<'a, P> = Filters<'a, P, FilterExtendedId>;
 
-/// Acceptance filters for incoming messages
+/// Acceptance filters for incoming messages. It is recommended to use the type
+/// aliases [`FiltersStandard`] and [`FiltersExtended`].
 pub struct Filters<'a, P, T> {
     memory: &'a mut [VolatileCell<T>],
     len: usize,
