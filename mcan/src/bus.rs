@@ -533,6 +533,12 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
 
         Ok(can)
     }
+
+    /// Leaves the peripheral non-operational and makes the `Dependencies`
+    /// available again.
+    pub fn release(self) -> D {
+        self.0.aux.dependencies
+    }
 }
 
 impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Can<'a, Id, D, C> {
@@ -551,5 +557,10 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities> Ca
     pub fn configure(self) -> CanConfigurable<'a, Id, D, C> {
         self.aux.configuration_mode();
         CanConfigurable(self)
+    }
+
+    /// Disables the peripheral and makes the `Dependencies` available again.
+    pub fn release(self) -> D {
+        self.configure().release()
     }
 }
