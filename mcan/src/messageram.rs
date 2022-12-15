@@ -1,4 +1,8 @@
 //! Memory management for the RAM interface between core and peripheral.
+//!
+//! More information can be found in the [`crate`] documentation.
+//!
+//! [`crate`]: crate#message-ram-configuration
 use crate::filter::{FilterExtendedId, FilterStandardId};
 use crate::message::{rx, tx, TxEvent};
 use core::mem::MaybeUninit;
