@@ -31,10 +31,8 @@
 //! In order to use MCAN, one has to instantiate [`CanConfigurable`] and
 //! [`finalize`] it. Its constructor requires an instance of an
 //! [`Dependencies`] implementing struct and holds onto it until it's
-//! [`freed`]. Safety requirements of the `Dependencies` trait
+//! [`released`]. Safety requirements of the `Dependencies` trait
 //! guarantee a correct state of MCAN interfaces during its operation.
-//!
-//! TODO: We do not have `CanConfigurable::free`??
 //!
 //! ## Message RAM Configuration
 //!
@@ -51,10 +49,10 @@
 //! valid, accessible to MCAN, RAM memory region.
 //!
 //! One can configure the Message RAM as follows
-//! - specify a custom MEMORY entry in a linker script mapped to the valid RAM
+//! - specify a custom `MEMORY` entry in a linker script mapped to the valid RAM
 //!   memory region
-//! - introduce a custom, `.bss` like (NOLOAD property), section - eg. `.can`
-//! - map a new custom input section to a new custom MEMORY entry
+//! - introduce a custom, `.bss` like (`NOLOAD` property), section - eg. `.can`
+//! - map the input section to the `MEMORY` entry
 //! - use the `#[link_section]` attribute in a code to link a static variable to
 //!   this memory region
 //!
@@ -253,7 +251,7 @@
 //! [`RTIC`]: https://rtic.rs
 //! [`CanConfigurable`]: crate::bus::CanConfigurable
 //! [`finalize`]: crate::bus::CanConfigurable::finalize
-//! [`free`]: crate::bus::CanConfigurable::free
+//! [`released`]: crate::bus::Can::release
 //! [`Dependencies`]: mcan_core::Dependencies
 //! [`Dependencies::eligible_message_ram_start`]: mcan_core::Dependencies::eligible_message_ram_start
 //! [`Capacities`]: crate::messageram::Capacities
