@@ -155,6 +155,12 @@ impl FromIterator<Interrupt> for InterruptSet {
     }
 }
 
+impl From<Interrupt> for InterruptSet {
+    fn from(value: Interrupt) -> Self {
+        Self(value.into())
+    }
+}
+
 impl core::fmt::Debug for InterruptSet {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "InterruptSet {{ ")?;
@@ -441,10 +447,16 @@ impl<Id: mcan_core::CanId> OwnedInterruptSet<Id> {
         Self(interrupts, PhantomData)
     }
 
+    /// Create an empty owned set
+    pub fn empty() -> Self {
+        // Safety: It is empty, thus there is no risk of aliasing.
+        unsafe { Self::new(InterruptSet(0)) }
+    }
+
     /// Moves ownership of the interrupts described by `subset` from `self` to
     /// the return value. If `self` does not contain `subset`, an error is
     /// returned.
-    fn split(&mut self, subset: InterruptSet) -> Result<Self, MaskError> {
+    pub fn split(&mut self, subset: InterruptSet) -> Result<Self, MaskError> {
         let missing = !self.0 .0 & subset.0;
         if missing != 0 {
             Err(MaskError(InterruptSet(missing)))
@@ -457,7 +469,7 @@ impl<Id: mcan_core::CanId> OwnedInterruptSet<Id> {
     }
 
     /// Assume ownership of the interrupts in `other`.
-    fn join(&mut self, other: Self) {
+    pub fn join(&mut self, other: Self) {
         // The sets should be disjoint as long as the constructor is used safely.
         debug_assert!(self.0 .0 & other.0 .0 == 0);
         // No assurance is provided at this level that the sets are assigned to the same
