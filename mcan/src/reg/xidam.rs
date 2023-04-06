@@ -57,7 +57,7 @@ impl<'a> EIDM_W<'a> {
     #[doc = r"Writes raw bits to the field"]
     #[inline(always)]
     pub unsafe fn bits(self, value: u32) -> &'a mut W {
-        self.w.bits = (self.w.bits & !0x1fff_ffff) | (value as u32 & 0x1fff_ffff);
+        self.w.bits = (self.w.bits & !0x1fff_ffff) | (value & 0x1fff_ffff);
         self.w
     }
 }
@@ -65,7 +65,7 @@ impl R {
     #[doc = "Bits 0:28 - Extended ID Mask"]
     #[inline(always)]
     pub fn eidm(&self) -> EIDM_R {
-        EIDM_R::new((self.bits & 0x1fff_ffff) as u32)
+        EIDM_R::new(self.bits & 0x1fff_ffff)
     }
 }
 impl W {

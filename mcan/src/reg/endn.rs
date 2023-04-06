@@ -32,7 +32,7 @@ impl R {
     #[doc = "Bits 0:31 - Endianness Test Value"]
     #[inline(always)]
     pub fn etv(&self) -> ETV_R {
-        ETV_R::new(self.bits as u32)
+        ETV_R::new(self.bits)
     }
 }
 #[doc = "Endian\n\nThis register you can [`read`](crate::reg::generic::Reg::read). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [endn](index.html) module"]
