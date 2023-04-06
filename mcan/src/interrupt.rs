@@ -409,6 +409,7 @@ impl Iterator for Iter {
     }
 }
 
+#[must_use]
 /// Has exclusive access to a set of interrupts for CAN peripheral `P`. Permits
 /// safe access to the owned interrupt flags.
 pub struct OwnedInterruptSet<P>(InterruptSet, PhantomData<P>);
