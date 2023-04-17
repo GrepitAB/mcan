@@ -442,11 +442,6 @@ pub trait DynOwnedInterruptSet {
     fn clear_interrupts(&self, interrupts: InterruptSet);
 }
 
-/// An input [`InterruptSet`] contained interrupts that were not available. The
-/// set wrapped in the error indicates which elements caused the problem.
-#[derive(Debug)]
-pub struct MaskError(pub InterruptSet);
-
 impl<Id: mcan_core::CanId> OwnedInterruptSet<Id> {
     /// Assumes exclusive ownership of `interrupts`.
     ///
@@ -466,18 +461,19 @@ impl<Id: mcan_core::CanId> OwnedInterruptSet<Id> {
     }
 
     /// Moves ownership of the interrupts described by `subset` from `self` to
-    /// the return value. If `self` does not contain `subset`, an error is
-    /// returned.
-    pub fn split(&mut self, subset: InterruptSet) -> Result<Self, MaskError> {
-        let missing = !self.0 .0 & subset.0;
-        if missing != 0 {
-            Err(MaskError(InterruptSet(missing)))
-        } else {
-            let remaining = self.0 .0 & !subset.0;
-            self.0 .0 = remaining;
-            // Safety: No aliasing is introduced since `subset` is moved from `self`.
-            unsafe { Ok(Self::new(subset)) }
-        }
+    /// the return value. Ones not owned by `self` are ignored.
+    pub fn split(&mut self, subset: InterruptSet) -> Self {
+        let remaining = self.0 .0 & !subset.0;
+        let split_out = self.0 .0 & subset.0;
+        self.0 .0 = remaining;
+        // Safety: No aliasing is introduced since `split_out` is moved from `self`.
+        unsafe { Self::new(InterruptSet(split_out)) }
+    }
+
+    /// Moves ownership of the interrupts that were flagged to
+    /// the return value.
+    pub fn split_flagged(&mut self) -> Self {
+        self.split(self.interrupt_flags())
     }
 
     /// Assume ownership of the interrupts in `other`.
@@ -538,12 +534,12 @@ pub trait DynInterruptConfiguration {
     type Id;
 
     /// Request to enable the set of `interrupts` on the chosen interrupt line.
-    /// Fails if some of the requested interrupts are already enabled.
+    /// Already enabled interrupts are ignored.
     fn enable(
         &mut self,
         interrupts: InterruptSet,
         line: InterruptLine,
-    ) -> Result<OwnedInterruptSet<Self::Id>, MaskError>;
+    ) -> OwnedInterruptSet<Self::Id>;
 
     /// Disable the set of `interrupts` and move ownership back to the
     /// `InterruptConfiguration`.
@@ -557,15 +553,11 @@ pub trait DynInterruptConfiguration {
 impl<Id: mcan_core::CanId> DynInterruptConfiguration for InterruptConfiguration<Id> {
     type Id = Id;
 
-    fn enable(
-        &mut self,
-        interrupts: InterruptSet,
-        line: InterruptLine,
-    ) -> Result<OwnedInterruptSet<Self::Id>, MaskError> {
-        let interrupts = self.disabled.split(interrupts)?;
+    fn enable(&mut self, interrupts: InterruptSet, line: InterruptLine) -> OwnedInterruptSet<Id> {
+        let interrupts = self.disabled.split(interrupts);
         self.set_line(&interrupts, line);
         self.set_enabled(&interrupts, true);
-        Ok(interrupts)
+        interrupts
     }
 
     fn disable(&mut self, interrupts: OwnedInterruptSet<Self::Id>) {
