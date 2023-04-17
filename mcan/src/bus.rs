@@ -2,7 +2,7 @@
 
 use crate::config::{BitTimingError, DATA_BIT_TIMING_RANGES, NOMINAL_BIT_TIMING_RANGES};
 use crate::filter::{FiltersExtended, FiltersStandard};
-use crate::interrupt::InterruptConfiguration;
+use crate::interrupt::{state, InterruptConfiguration, OwnedInterruptSet};
 use crate::messageram::SharedMemoryInner;
 use crate::reg::{ecr::R as ECR, psr::R as PSR};
 use crate::rx_dedicated_buffers::RxDedicatedBuffer;
@@ -111,6 +111,8 @@ impl From<BitTimingError> for ConfigurationError {
 pub struct Can<'a, Id, D, C: Capacities> {
     /// Controls enabling and line selection of interrupts.
     pub interrupts: InterruptConfiguration<Id>,
+    /// Initial set of interrupts in a disabled state.
+    pub interrupt_set: OwnedInterruptSet<Id, state::Disabled>,
     /// Receive FIFO 0
     pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0Message>,
     /// Receive FIFO 1
@@ -501,6 +503,7 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
             // should not be touched by any other code. This has to be upheld by all code that has
             // access to the register block.
             interrupts: unsafe { InterruptConfiguration::new() },
+            interrupt_set: unsafe { OwnedInterruptSet::initial_state() },
             rx_fifo_0: unsafe { RxFifo::new(&mut memory.rx_fifo_0) },
             rx_fifo_1: unsafe { RxFifo::new(&mut memory.rx_fifo_1) },
             rx_dedicated_buffers: unsafe {
