@@ -15,21 +15,6 @@ pub struct TxEventFifo<'a, P> {
     _markers: PhantomData<P>,
 }
 
-/// Trait which erases generic parametrization for [`TxEventFifo`] type
-pub trait DynTxEventFifo {
-    /// CAN identity type
-    type Id;
-
-    /// Returns the number of elements in the queue
-    fn len(&self) -> usize;
-    /// Returns `true` if the queue is empty
-    fn is_empty(&self) -> bool;
-    /// Returns the number of elements the queue can hold
-    fn capacity(&self) -> usize;
-    /// Takes the first event from the queue
-    fn pop(&mut self) -> Option<TxEvent>;
-}
-
 impl<'a, P: mcan_core::CanId> TxEventFifo<'a, P> {
     /// # Safety
     /// The caller must be the owner or the peripheral referenced by `P`. The
@@ -59,24 +44,24 @@ impl<'a, P: mcan_core::CanId> TxEventFifo<'a, P> {
         // Safety: `Self` owns the register.
         unsafe { &self.regs().txefa }
     }
-}
 
-impl<'a, P: mcan_core::CanId> DynTxEventFifo for TxEventFifo<'a, P> {
-    type Id = P;
-
-    fn len(&self) -> usize {
+    /// Returns the number of elements in the queue
+    pub fn len(&self) -> usize {
         self.txefs().read().effl().bits() as usize
     }
 
-    fn is_empty(&self) -> bool {
+    /// Returns `true` if the queue is empty
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    fn capacity(&self) -> usize {
+    /// Returns the number of elements the queue can hold
+    pub fn capacity(&self) -> usize {
         self.memory.len()
     }
 
-    fn pop(&mut self) -> Option<TxEvent> {
+    /// Takes the first event from the queue
+    pub fn pop(&mut self) -> Option<TxEvent> {
         let status = self.txefs().read();
         if status.effl().bits() == 0 {
             None

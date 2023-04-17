@@ -143,65 +143,41 @@ pub struct Aux<'a, Id, D> {
     filters_extended: FiltersExtended<'a, Id>,
 }
 
-/// Trait which erases generic parametrization for [`Aux`] type
-pub trait DynAux {
-    /// CAN identity type
-    type Id;
-
-    /// CAN dependencies type
-    type Deps;
-
+impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Aux<'a, Id, D> {
     /// Re-enters "Normal Operation" if in "Software Initialization" mode.
     /// In Software Initialization, messages are not received or transmitted.
     /// Configuration cannot be changed. In Normal Operation, messages can
     /// be transmitted and received.
-    fn operational_mode(&self);
+    pub fn operational_mode(&self) {
+        self.reg.operational_mode();
+    }
 
     /// Returns `true` if the peripheral is in "Normal Operation" mode.
-    fn is_operational(&self) -> bool;
+    pub fn is_operational(&self) -> bool {
+        self.reg.is_operational()
+    }
 
     /// Access the error counters register value
-    fn error_counters(&self) -> ErrorCounters;
+    pub fn error_counters(&self) -> ErrorCounters {
+        ErrorCounters(self.reg.ecr.read())
+    }
 
     /// Access the protocol status register value
     ///
     /// Reading the register clears fields: PXE, RFDF, RBRS, RESI, DLEC, LEC.
-    fn protocol_status(&self) -> ProtocolStatus;
+    pub fn protocol_status(&self) -> ProtocolStatus {
+        ProtocolStatus(self.reg.psr.read())
+    }
 
     /// Current value of the timestamp counter
     ///
     /// If timestamping is disabled, its value is zero.
-    fn timestamp(&self) -> u16;
-}
+    pub fn timestamp(&self) -> u16 {
+        self.reg.tscv.read().tsc().bits()
+    }
 
-impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Aux<'a, Id, D> {
     fn configuration_mode(&self) {
         self.reg.configuration_mode()
-    }
-}
-
-impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'a, Id, D> {
-    type Id = Id;
-    type Deps = D;
-
-    fn operational_mode(&self) {
-        self.reg.operational_mode();
-    }
-
-    fn is_operational(&self) -> bool {
-        self.reg.is_operational()
-    }
-
-    fn error_counters(&self) -> ErrorCounters {
-        ErrorCounters(self.reg.ecr.read())
-    }
-
-    fn protocol_status(&self) -> ProtocolStatus {
-        ProtocolStatus(self.reg.psr.read())
-    }
-
-    fn timestamp(&self) -> u16 {
-        self.reg.tscv.read().tsc().bits()
     }
 }
 
