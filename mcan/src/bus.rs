@@ -242,6 +242,12 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         &mut self.0.interrupts
     }
 
+    /// Allows accessing the interrupt set necessary for the interrupt
+    /// reconfiguration.
+    pub fn interrupt_set(&mut self) -> &mut OwnedInterruptSet<Id, state::Disabled> {
+        &mut self.0.interrupt_set
+    }
+
     /// Allows reconfiguring config
     pub fn config(&mut self) -> &mut CanConfig {
         &mut self.0.aux.config

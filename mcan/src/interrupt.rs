@@ -4,6 +4,8 @@
 //! initialization through [`CanConfigurable::interrupts`] or at runtime through
 //! [`Can::interrupts`].
 //!
+//! TODO: Expand documentation regarding how this token system should be used
+//!
 //! ```no_run
 //! # use mcan::bus::Can;
 //! # use mcan::core::CanId;
@@ -33,11 +35,16 @@
 //! # let mut can: Can<'static, Can0, (), Caps> = unsafe { std::mem::transmute([0u8; 176]) };
 //! use mcan::interrupt::{Interrupt, InterruptLine};
 //! // During initialization
-//! let desired_interrupts = [Interrupt::BusOff, Interrupt::RxFifo0NewMessage];
-//! let enabled_interrupts = can.interrupts.enable(
-//!     desired_interrupts.iter().copied().collect(),
-//!     InterruptLine::Line0
-//! ).unwrap();
+//! let enabled_interrupts = can.interrupts.enable_line_0(
+//!     can.interrupt_set
+//!         .split(
+//!             [Interrupt::BusOff, Interrupt::RxFifo0NewMessage]
+//!                 .iter()
+//!                 .copied()
+//!                 .collect(),
+//!         )
+//!         .unwrap(),
+//! );
 //!
 //! // When an interrupt arrives
 //! for interrupt in enabled_interrupts.iter_flagged() {
