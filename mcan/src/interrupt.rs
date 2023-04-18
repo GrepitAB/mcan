@@ -382,6 +382,11 @@ impl InterruptSet {
             index: 0,
         }
     }
+
+    /// Helper function checking if an `InterruptSet` is empty
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
 }
 
 /// An iterator over the items of an [`InterruptSet`].
