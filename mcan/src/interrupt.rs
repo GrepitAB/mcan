@@ -419,6 +419,12 @@ impl Iterator for Iter {
 /// safe access to the owned interrupt flags.
 pub struct OwnedInterruptSet<P>(InterruptSet, PhantomData<P>);
 
+impl<Id: mcan_core::CanId> Default for OwnedInterruptSet<Id> {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
 /// Trait which erases generic parametrization for [`OwnedInterruptSet`] type
 pub trait DynOwnedInterruptSet {
     /// CAN identity type
