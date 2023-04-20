@@ -1,10 +1,16 @@
 //! Interrupt configuration and access.
 //!
-//! Interrupts are configured by accessing the [`InterruptConfiguration`] during
-//! initialization through [`CanConfigurable::interrupt_configuration`] or at
-//! runtime through [`Can::interrupt_configuration`].
+//! Interrupts are handled through [`OwnedInterruptSet`]s. They allow multiple
+//! parties to concurrently read or clear interrupts, as long as the sets
+//! of interrupts they operate on are disjoint. Initially, all interrupts
+//! will reside in a single `OwnedInterruptSet`, which can be
+//! [`OwnedInterruptSet::split`] to produce disjoint sets.
 //!
-//! TODO: Expand documentation regarding how this token system should be used
+//! Interrupts can be assigned to one of two interrupt lines of the
+//! processor's interrupt controller, or they can be disabled. Reconfiguring
+//! whether they are enabled and if so on which line requires more
+//! synchronization than the typical reading and clearing of flags, so this
+//! is done through methods on the [`InterruptConfiguration`].
 //!
 //! ```no_run
 //! # use mcan::bus::Can;
@@ -61,9 +67,6 @@
 //!     }
 //! }
 //! ```
-//!
-//! [`Can::interrupt_configuration`]: crate::bus::Can::interrupt_configuration
-//! [`CanConfigurable::interrupt_configuration`]: crate::bus::CanConfigurable::interrupt_configuration
 pub mod state;
 
 use crate::reg;
