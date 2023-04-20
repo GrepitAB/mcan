@@ -2,7 +2,7 @@
 
 use crate::config::{BitTimingError, DATA_BIT_TIMING_RANGES, NOMINAL_BIT_TIMING_RANGES};
 use crate::filter::{FiltersExtended, FiltersStandard};
-use crate::interrupt::InterruptConfiguration;
+use crate::interrupt::{state, InterruptConfiguration, OwnedInterruptSet};
 use crate::messageram::SharedMemoryInner;
 use crate::reg::{ecr::R as ECR, psr::R as PSR};
 use crate::rx_dedicated_buffers::RxDedicatedBuffer;
@@ -110,7 +110,9 @@ impl From<BitTimingError> for ConfigurationError {
 /// resume sending and receiving messages.
 pub struct Can<'a, Id, D, C: Capacities> {
     /// Controls enabling and line selection of interrupts.
-    pub interrupts: InterruptConfiguration<Id>,
+    pub interrupt_configuration: InterruptConfiguration<Id>,
+    /// Initial set of interrupts in a disabled state.
+    pub interrupts: OwnedInterruptSet<Id, state::Disabled>,
     /// Receive FIFO 0
     pub rx_fifo_0: RxFifo<'a, Fifo0, Id, C::RxFifo0Message>,
     /// Receive FIFO 1
@@ -236,7 +238,13 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
     }
 
     /// Allows reconfiguring interrupts.
-    pub fn interrupts(&mut self) -> &mut InterruptConfiguration<Id> {
+    pub fn interrupt_configuration(&mut self) -> &mut InterruptConfiguration<Id> {
+        &mut self.0.interrupt_configuration
+    }
+
+    /// Allows accessing the interrupt set necessary for the interrupt
+    /// reconfiguration.
+    pub fn interrupts(&mut self) -> &mut OwnedInterruptSet<Id, state::Disabled> {
         &mut self.0.interrupts
     }
 
@@ -495,12 +503,17 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
 
         let config = CanConfig::new(bitrate);
 
+        // Safety: Since `Can::new` takes a PAC singleton, it can only be called once.
+        // Then no duplicates will be constructed. The registers that are
+        // delegated to these components should not be touched by any other
+        // code. This has to be upheld by all code that has access to the
+        // register block.
+
+        let (interrupt_configuration, interrupts) = unsafe { InterruptConfiguration::new() };
+
         let can = CanConfigurable(Can {
-            // Safety: Since `Can::new` takes a PAC singleton, it can only be called once. Then no
-            // duplicates will be constructed. The registers that are delegated to these components
-            // should not be touched by any other code. This has to be upheld by all code that has
-            // access to the register block.
-            interrupts: unsafe { InterruptConfiguration::new() },
+            interrupt_configuration,
+            interrupts,
             rx_fifo_0: unsafe { RxFifo::new(&mut memory.rx_fifo_0) },
             rx_fifo_1: unsafe { RxFifo::new(&mut memory.rx_fifo_1) },
             rx_dedicated_buffers: unsafe {
