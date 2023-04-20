@@ -1,8 +1,8 @@
 //! Interrupt configuration and access.
 //!
 //! Interrupts are configured by accessing the [`InterruptConfiguration`] during
-//! initialization through [`CanConfigurable::interrupts`] or at runtime through
-//! [`Can::interrupts`].
+//! initialization through [`CanConfigurable::interrupt_configuration`] or at
+//! runtime through [`Can::interrupt_configuration`].
 //!
 //! TODO: Expand documentation regarding how this token system should be used
 //!
@@ -35,16 +35,18 @@
 //! # let mut can: Can<'static, Can0, (), Caps> = unsafe { std::mem::transmute([0u8; 176]) };
 //! use mcan::interrupt::{Interrupt, InterruptLine};
 //! // During initialization
-//! let enabled_interrupts = can.interrupts.enable_line_0(
-//!     can.interrupt_set
-//!         .split(
-//!             [Interrupt::BusOff, Interrupt::RxFifo0NewMessage]
-//!                 .iter()
-//!                 .copied()
-//!                 .collect(),
-//!         )
-//!         .unwrap(),
-//! );
+//! let enabled_interrupts = can
+//!     .interrupt_configuration
+//!     .enable_line_0(
+//!         can.interrupts
+//!             .split(
+//!                 [Interrupt::BusOff, Interrupt::RxFifo0NewMessage]
+//!                     .iter()
+//!                     .copied()
+//!                     .collect(),
+//!             )
+//!             .unwrap(),
+//!     );
 //!
 //! // When an interrupt arrives
 //! for interrupt in enabled_interrupts.iter_flagged() {
@@ -60,8 +62,8 @@
 //! }
 //! ```
 //!
-//! [`Can::interrupts`]: crate::bus::Can::interrupts
-//! [`CanConfigurable::interrupts`]: crate::bus::Can::interrupts
+//! [`Can::interrupt_configuration`]: crate::bus::Can::interrupt_configuration
+//! [`CanConfigurable::interrupt_configuration`]: crate::bus::CanConfigurable::interrupt_configuration
 pub mod state;
 
 use crate::reg;
@@ -452,22 +454,12 @@ impl<Id: mcan_core::CanId, State> OwnedInterruptSet<Id, State> {
     /// Assumes exclusive ownership of `interrupts`.
     ///
     /// # Safety
-    /// Each interrupt of a CAN peripheral can only be contained in one
+    /// - Each interrupt of a CAN peripheral can only be contained in one
     /// `OwnedInterruptSet`, otherwise registers will be mutably aliased.
-    ///
-    /// The reserved bits must not be included.
+    /// - The reserved bits must not be included.
+    /// - `State` type parameter must match the state in runtime.
     unsafe fn new(interrupts: InterruptSet) -> Self {
         Self(interrupts, PhantomData)
-    }
-
-    /// Helper constructor providing initial state of all interrupts
-    ///
-    /// # Safety
-    /// Each interrupt of a CAN peripheral can only be contained in one
-    /// `OwnedInterruptSet`, otherwise registers will be mutably aliased.
-    pub(crate) unsafe fn initial_state() -> Self {
-        // Safety: The reserved bits are omitted.
-        unsafe { Self::new(InterruptSet(0x3fff_ffff)) }
     }
 
     /// Create an empty owned set
@@ -509,7 +501,8 @@ impl<Id: mcan_core::CanId, State> OwnedInterruptSet<Id, State> {
 
     /// Internal function that allows conversions from any state to any state.
     ///
-    /// Safety: Caller must make sure that the state switch is correct
+    /// # Safety
+    /// Caller must make sure that the state switch is reflected in runtime.
     unsafe fn convert<NewState>(self) -> OwnedInterruptSet<Id, NewState> {
         // Safety: No aliasing is introduced since whole `self.0` is moved
         unsafe { OwnedInterruptSet::new(self.0) }
@@ -563,63 +556,68 @@ impl<Id: mcan_core::CanId, State: state::MaybeEnabled> OwnedInterruptSet<Id, Sta
 pub struct InterruptConfiguration<P>(PhantomData<P>);
 
 impl<Id: mcan_core::CanId> InterruptConfiguration<Id> {
-    /// Enable interrupts contained in an `ois` or switch them to the line 0.
+    /// Enable interrupts contained in an `interrupt` or switch them to the line
+    /// 0.
     pub fn enable_line_0<State>(
         &mut self,
-        ois: OwnedInterruptSet<Id, State>,
+        interrupt: OwnedInterruptSet<Id, State>,
     ) -> OwnedInterruptSet<Id, state::EnabledLine0> {
         // Safety: Convert to `EnabledLine0`
-        unsafe { self.raw_enable(ois, InterruptLine::Line0) }
+        unsafe { self.raw_enable(interrupt, InterruptLine::Line0) }
     }
 
-    /// Enable interrupts contained in an `ois` or switch them to the line 1.
+    /// Enable interrupts contained in an `interrupt` or switch them to the line
+    /// 1.
     pub fn enable_line_1<State>(
         &mut self,
-        ois: OwnedInterruptSet<Id, State>,
+        interrupt: OwnedInterruptSet<Id, State>,
     ) -> OwnedInterruptSet<Id, state::EnabledLine1> {
         // Safety: Convert to `EnabledLine1`
-        unsafe { self.raw_enable(ois, InterruptLine::Line1) }
+        unsafe { self.raw_enable(interrupt, InterruptLine::Line1) }
     }
 
-    /// Enable interrupts contained in an `ois` or switch to the specified
+    /// Enable interrupts contained in an `interrupt` or switch to the specified
     /// `line`.
     ///
     /// Returned set is in a dynamic state.
     pub fn enable<State>(
         &mut self,
-        ois: OwnedInterruptSet<Id, State>,
+        interrupt: OwnedInterruptSet<Id, State>,
         line: InterruptLine,
     ) -> OwnedInterruptSet<Id> {
         match line {
-            InterruptLine::Line0 => self.enable_line_0(ois).into(),
-            InterruptLine::Line1 => self.enable_line_1(ois).into(),
+            InterruptLine::Line0 => self.enable_line_0(interrupt).into(),
+            InterruptLine::Line1 => self.enable_line_1(interrupt).into(),
         }
     }
 
     /// Disable interrupts
     pub fn disable<State>(
         &mut self,
-        ois: OwnedInterruptSet<Id, State>,
+        interrupt: OwnedInterruptSet<Id, State>,
     ) -> OwnedInterruptSet<Id, state::Disabled> {
-        // Safety: Convert to `Dynamic` for HW calls
-        let ois = unsafe { ois.convert() };
-        self.set_enabled(&ois, false);
-        // Safety: Convert to `Disabled`
-        unsafe { ois.convert() }
+        // Convert to `Dynamic` for HW calls
+        // Safety: A `Dynamic` set can contain interrupts in any state
+        let interrupt = unsafe { interrupt.convert() };
+        self.set_enabled(&interrupt, false);
+        // Safety: Interrupt was disabled so type state is `Disabled`
+        unsafe { interrupt.convert() }
     }
 
-    /// Safety: Caller must make sure that the state switch is correct
-    unsafe fn raw_enable<In, Out>(
+    /// # Safety
+    /// Caller must make sure that the type state matches the selected `line`.
+    unsafe fn raw_enable<In, Out: state::MaybeEnabled>(
         &mut self,
-        ois: OwnedInterruptSet<Id, In>,
+        interrupt: OwnedInterruptSet<Id, In>,
         line: InterruptLine,
     ) -> OwnedInterruptSet<Id, Out> {
-        // Safety: Convert to `Dynamic` for HW calls
-        let ois = unsafe { ois.convert() };
-        self.set_line(&ois, line);
-        self.set_enabled(&ois, true);
-        // Safety: Bubble up the safety requirement
-        unsafe { ois.convert() }
+        // Convert to `Dynamic` for HW calls
+        // Safety: A `Dynamic` set can contain interrupts in any state
+        let interrupt = unsafe { interrupt.convert() };
+        self.set_line(&interrupt, line);
+        self.set_enabled(&interrupt, true);
+        // Safety: Interrupt was enabled but type state is yet to be determined
+        unsafe { interrupt.convert() }
     }
 
     /// # Safety
@@ -630,11 +628,16 @@ impl<Id: mcan_core::CanId> InterruptConfiguration<Id> {
     /// - ILE
     /// - IE
     /// - IR
-    pub(crate) unsafe fn new() -> Self {
+    pub(crate) unsafe fn new() -> (Self, OwnedInterruptSet<Id, state::Disabled>) {
+        const RESERVED_BITS: u32 = 0x3fff_ffff;
         let v = Self(PhantomData);
         // Disable all interrupts on the peripheral by writing the reset value.
         v.ils().write(|w| w);
-        v
+        // Safety: The reserved bits are omitted and interrupts are disabled
+        // and thus the state is correct.
+        (v, unsafe {
+            OwnedInterruptSet::<_, state::Disabled>::new(InterruptSet(RESERVED_BITS))
+        })
     }
 
     fn ils(&self) -> &reg::ILS {

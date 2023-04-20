@@ -191,7 +191,7 @@
 //!
 //! // Example interrupt configuration
 //! let interrupts_to_be_enabled = can
-//!     .interrupt_set()
+//!     .interrupts()
 //!     .split(
 //!         [
 //!             Interrupt::RxFifo0NewMessage,
@@ -202,10 +202,12 @@
 //!         .collect(),
 //!     )
 //!     .unwrap();
-//! let line_0_interrupts = can.interrupts().enable_line_0(interrupts_to_be_enabled);
+//! let line_0_interrupts = can
+//!     .interrupt_configuration()
+//!     .enable_line_0(interrupts_to_be_enabled);
 //!
 //! let interrupts_to_be_enabled = can
-//!     .interrupt_set()
+//!     .interrupts()
 //!     .split(
 //!         [
 //!             Interrupt::RxFifo1NewMessage,
@@ -216,7 +218,9 @@
 //!         .collect(),
 //!     )
 //!     .unwrap();
-//! let line_0_interrupts = can.interrupts().enable_line_1(interrupts_to_be_enabled);
+//! let line_1_interrupts = can
+//!     .interrupt_configuration()
+//!     .enable_line_1(interrupts_to_be_enabled);
 //!
 //! // Example filters configuration
 //! // This filter will put all messages with a standard ID into RxFifo0
