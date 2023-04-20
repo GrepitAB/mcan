@@ -8,10 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- New functions
-    - `mcan::interrupt::OwnedInterruptSet::empty`
-    - `mcan::interrupt::OwnedInterruptSet::split`
-    - `mcan::interrupt::OwnedInterruptSet::join`
-- Trait impls
-    - Default for `InterruptSet`
+- Expand interrupt API (#34)
+- Add `Default` implementation for `OwnedInterruptSet` (#37)
+- Add InterruptSet::is_empty (#36)
 
+### Changed
+- *Breaking:* Refine the interrupt system (#39)
+- Make `OwnedInterruptSet` `must_use` (#33)
+
+## [0.2.0] - 2022-12-15
+
+This is a first actual release of the `mcan` crate.
+
+- Release mcan/0.2.0 (#29)
