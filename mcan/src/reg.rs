@@ -49,6 +49,10 @@ impl<Id: mcan_core::CanId> Can<Id> {
         self.enable_cce();
     }
 
+    pub(crate) fn initialization_mode(&self) {
+        self.set_init(true);
+    }
+
     pub(crate) fn operational_mode(&self) {
         self.set_init(false);
     }
