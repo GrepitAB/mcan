@@ -3,3 +3,4 @@ members = [
     "mcan",
     "mcan-core",
 ]
+resolver = "2"
