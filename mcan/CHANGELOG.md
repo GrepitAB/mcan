@@ -3,7 +3,7 @@
 Tagging in git follows a pattern: `mcan/<version>`.
 
 ## [Unreleased]
-- Add Can::aux::initialization_mode
+- Add `Can::aux::initialization_mode` (#41)
 - Adhere to `filter_map_bool_then` clippy lint (#42)
 
 ## [0.3.0] - 2023-04-24
