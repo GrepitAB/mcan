@@ -127,7 +127,8 @@ impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> DynRxDedicatedBuffer
         self.memory
             .iter()
             .enumerate()
-            .filter_map(|(i, m)| self.has_new_data(i).then(|| (i, m.get())))
+            .filter(|&(i, _)| self.has_new_data(i))
+            .map(|(i, m)| (i, m.get()))
             .min_by_key(|(_, m)| m.id())
             .map(|(i, m)| {
                 self.mark_buffer_read(i);
