@@ -153,6 +153,10 @@ pub trait DynAux {
     /// CAN dependencies type
     type Deps;
 
+    /// Enters Initialization mode, without enabling configuration, to
+    /// disable CAN operation.
+    fn initialization_mode(&self);
+
     /// Re-enters "Normal Operation" if in "Software Initialization" mode.
     /// In Software Initialization, messages are not received or transmitted.
     /// Configuration cannot be changed. In Normal Operation, messages can
@@ -185,6 +189,10 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Aux<'a, Id, D> {
 impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'a, Id, D> {
     type Id = Id;
     type Deps = D;
+
+    fn initialization_mode(&self) {
+        self.reg.initialization_mode();
+    }
 
     fn operational_mode(&self) {
         self.reg.operational_mode();
