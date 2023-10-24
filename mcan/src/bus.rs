@@ -339,9 +339,10 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         reg.rxf0.c.modify(|_, w| {
             let w = w.fom().bit(config.rx_fifo_0.mode.into());
             let mut watermark = config.rx_fifo_0.watermark;
-            // According to the spec, any value >= 64 is interpreted as watermark disabled
-            if watermark >= 64 {
-                watermark = 64;
+            // According to the spec, any value > 64 is interpreted as watermark interrupt
+            // disabled, as is 0.
+            if watermark > 64 {
+                watermark = 0;
             }
             // Safety: The value is sanitized before the write
             unsafe { w.fwm().bits(watermark) }
@@ -351,9 +352,10 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         reg.rxf1.c.modify(|_, w| {
             let w = w.fom().bit(config.rx_fifo_1.mode.into());
             let mut watermark = config.rx_fifo_1.watermark;
-            // According to the spec, any value >= 64 is interpreted as watermark disabled
-            if watermark >= 64 {
-                watermark = 64;
+            // According to the spec, any value > 64 is interpreted as watermark interrupt
+            // disabled, as is 0.
+            if watermark > 64 {
+                watermark = 0;
             }
             // Safety: The value is sanitized before the write
             unsafe { w.fwm().bits(watermark) }
@@ -366,9 +368,10 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         // Configure Tx Event Fifo
         reg.txefc.modify(|_, w| {
             let mut watermark = config.tx.tx_event_fifo_watermark;
-            // According to the spec, any value >= 32 is interpreted as watermark disabled
-            if watermark >= 32 {
-                watermark = 32;
+            // According to the spec, any value > 32 is interpreted as watermark interrupt
+            // disabled, as is 0.
+            if watermark > 32 {
+                watermark = 0;
             }
             // Safety: The value is sanitized before the write
             unsafe { w.efwm().bits(watermark) }
