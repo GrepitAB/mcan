@@ -3,6 +3,7 @@
 Tagging in git follows a pattern: `mcan/<version>`.
 
 ## [Unreleased]
+- Fix some issues with watermark sizes for Rx FIFOs and Tx Event FIFO (#43)
 - Add `Can::aux::initialization_mode` (#41)
 - Adhere to `filter_map_bool_then` clippy lint (#42)
 
