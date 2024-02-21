@@ -35,6 +35,12 @@ impl<Id> Can<Id> {
 
 impl<Id: mcan_core::CanId> Can<Id> {
     fn set_init(&self, value: bool) {
+        // Ensure we leave the shutdown state properly if we have entered it.
+        if !value {
+            self.cccr.modify(|_, w| w.csr().clear_bit());
+            while self.cccr.read().csa().bit_is_set() {}
+        }
+
         self.cccr.modify(|_, w| w.init().bit(value));
         while self.cccr.read().init().bit() != value {}
     }

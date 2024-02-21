@@ -157,6 +157,14 @@ pub trait DynAux {
     /// disable CAN operation.
     fn initialization_mode(&self);
 
+    /// Sets MCAN up for being shut down.
+    /// See `Power Down (sleep mode)`, in the peripheral docs, for user
+    /// consideration regarding clocking and message handling.
+    fn shutdown(&self);
+
+    /// Check if csa bit is set
+    fn ready_for_shutdown(&self) -> bool;
+
     /// Re-enters "Normal Operation" if in "Software Initialization" mode.
     /// In Software Initialization, messages are not received or transmitted.
     /// Configuration cannot be changed. In Normal Operation, messages can
@@ -204,6 +212,14 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'a
 
     fn error_counters(&self) -> ErrorCounters {
         ErrorCounters(self.reg.ecr.read())
+    }
+
+    fn shutdown(&self) {
+        self.reg.cccr.write(|w| w.csr().set_bit());
+    }
+
+    fn ready_for_shutdown(&self) -> bool {
+        self.reg.cccr.read().csa().bit_is_set()
     }
 
     fn protocol_status(&self) -> ProtocolStatus {
