@@ -4,7 +4,7 @@ Tagging in git follows a pattern: `mcan/<version>`.
 
 ## [Unreleased]
 - *Breaking* Update the register mappings with svd2rust 0.30.2 and form 0.10.0 (#46)
-- Add `Can::aux::shutdown` to safely shutdown the bus
+- Add `Can::aux::shutdown` to safely shutdown the bus (#45)
 
 ## [0.4.0] - 2023-10-24
 
