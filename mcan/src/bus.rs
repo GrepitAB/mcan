@@ -157,13 +157,26 @@ pub trait DynAux {
     /// disable CAN operation.
     fn initialization_mode(&self);
 
-    /// Sets MCAN up for being shut down.
+    /// Requests the peripheral to enter "power down" mode.
+    ///
     /// See `Power Down (sleep mode)`, in the peripheral docs, for user
     /// consideration regarding clocking and message handling.
-    fn shutdown(&self);
+    ///
+    /// It is also worth noting that this mode should not be interpreted as the
+    /// peripheral being "powered off", since it is still possible to
+    /// configure the peripheral while in this mode.
+    fn power_down_mode(&self);
 
-    /// Check if csa bit is set
-    fn ready_for_shutdown(&self) -> bool;
+    /// Check if the transition to `Power Down (sleep mode)` is complete and
+    /// that it is safe to completely disable the peripheral.
+    ///
+    /// Returns `false` if the peripheral is still handling outgoing or
+    /// incomming messages.
+    ///
+    /// If the bus is heavily congested, the peripheral
+    /// might never enter `Power Down (sleep mode)` on its own. In that case
+    /// it can be forced by calling `initialization_mode`.
+    fn is_ready_for_power_off(&self) -> bool;
 
     /// Re-enters "Normal Operation" if in "Software Initialization" mode.
     /// In Software Initialization, messages are not received or transmitted.
@@ -214,11 +227,11 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'a
         ErrorCounters(self.reg.ecr.read())
     }
 
-    fn shutdown(&self) {
+    fn power_down_mode(&self) {
         self.reg.cccr.write(|w| w.csr().set_bit());
     }
 
-    fn ready_for_shutdown(&self) -> bool {
+    fn is_ready_for_power_off(&self) -> bool {
         self.reg.cccr.read().csa().bit_is_set()
     }
 
