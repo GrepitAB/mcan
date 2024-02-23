@@ -35,8 +35,8 @@ impl<Id> Can<Id> {
 
 impl<Id: mcan_core::CanId> Can<Id> {
     fn set_init(&self, value: bool) {
-        // Ensure the peripheral leaves the "power down" mode properly if it previously
-        // entered.
+        // Ensure the peripheral leaves the "power down" mode properly if it was
+        // previously entered.
         if !value {
             self.cccr.modify(|_, w| w.csr().clear_bit());
             while self.cccr.read().csa().bit_is_set() {}

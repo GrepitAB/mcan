@@ -163,19 +163,19 @@ pub trait DynAux {
     /// consideration regarding clocking and message handling.
     ///
     /// It is also worth noting that this mode should not be interpreted as the
-    /// peripheral being "powered off", since it is still possible to
-    /// configure the peripheral while in this mode.
+    /// peripheral being "powered off", since it is still possible to configure
+    /// the peripheral while in this mode.
     fn power_down_mode(&self);
 
     /// Check if the transition to `Power Down (sleep mode)` is complete and
     /// that it is safe to completely disable the peripheral.
     ///
     /// Returns `false` if the peripheral is still handling outgoing or
-    /// incomming messages.
+    /// incoming messages.
     ///
-    /// If the bus is heavily congested, the peripheral
-    /// might never enter `Power Down (sleep mode)` on its own. In that case
-    /// it can be forced by calling `initialization_mode`.
+    /// If the bus is heavily congested, the peripheral might never enter
+    /// `Power Down (sleep mode)` on its own. In that case it can be forced by
+    /// calling `initialization_mode`.
     fn is_ready_for_power_off(&self) -> bool;
 
     /// Re-enters "Normal Operation" if in "Software Initialization" mode.
