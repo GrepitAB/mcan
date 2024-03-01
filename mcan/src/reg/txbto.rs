@@ -226,7 +226,7 @@ impl R {
         TO31_R::new(((self.bits >> 31) & 1) != 0)
     }
 }
-#[doc = "Tx Buffer Transmission Occurred\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`txbto::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "Tx Buffer Transmission Occurred\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`txbto::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct TXBTO_SPEC;
 impl crate::RegisterSpec for TXBTO_SPEC {
     type Ux = u32;

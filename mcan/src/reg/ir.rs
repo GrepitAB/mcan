@@ -466,7 +466,7 @@ impl W {
         self
     }
 }
-#[doc = "Interrupt\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`ir::R`](R).  You can [`reset`](crate::generic::Reg::reset), [`write`](crate::generic::Reg::write), [`write_with_zero`](crate::generic::Reg::write_with_zero) this register using [`ir::W`](W). You can also [`modify`](crate::generic::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "Interrupt\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`ir::R`](R).  You can [`reset`](crate::reg::generic::Reg::reset), [`write`](crate::reg::generic::Reg::write), [`write_with_zero`](crate::reg::generic::Reg::write_with_zero) this register using [`ir::W`](W). You can also [`modify`](crate::reg::generic::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct IR_SPEC;
 impl crate::RegisterSpec for IR_SPEC {
     type Ux = u32;

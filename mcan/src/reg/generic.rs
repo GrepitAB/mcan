@@ -1,3 +1,4 @@
+//! Register access helpers
 use core::marker;
 #[doc = " Raw register type (`u8`, `u16`, `u32`, ...)"]
 pub trait RawReg:

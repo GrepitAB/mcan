@@ -226,7 +226,7 @@ impl R {
         CF31_R::new(((self.bits >> 31) & 1) != 0)
     }
 }
-#[doc = "Tx Buffer Cancellation Finished\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`txbcf::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "Tx Buffer Cancellation Finished\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`txbcf::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct TXBCF_SPEC;
 impl crate::RegisterSpec for TXBCF_SPEC {
     type Ux = u32;

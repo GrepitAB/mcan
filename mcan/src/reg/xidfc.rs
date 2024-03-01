@@ -46,7 +46,7 @@ impl W {
         self
     }
 }
-#[doc = "Extended ID Filter Configuration\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`xidfc::R`](R).  You can [`reset`](crate::generic::Reg::reset), [`write`](crate::generic::Reg::write), [`write_with_zero`](crate::generic::Reg::write_with_zero) this register using [`xidfc::W`](W). You can also [`modify`](crate::generic::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "Extended ID Filter Configuration\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`xidfc::R`](R).  You can [`reset`](crate::reg::generic::Reg::reset), [`write`](crate::reg::generic::Reg::write), [`write_with_zero`](crate::reg::generic::Reg::write_with_zero) this register using [`xidfc::W`](W). You can also [`modify`](crate::reg::generic::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct XIDFC_SPEC;
 impl crate::RegisterSpec for XIDFC_SPEC {
     type Ux = u32;

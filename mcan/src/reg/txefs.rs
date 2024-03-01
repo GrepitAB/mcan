@@ -37,7 +37,7 @@ impl R {
         TEFL_R::new(((self.bits >> 25) & 1) != 0)
     }
 }
-#[doc = "Tx Event FIFO Status\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`txefs::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "Tx Event FIFO Status\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`txefs::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct TXEFS_SPEC;
 impl crate::RegisterSpec for TXEFS_SPEC {
     type Ux = u32;

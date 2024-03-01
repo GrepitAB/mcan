@@ -30,7 +30,7 @@ impl R {
         TFQF_R::new(((self.bits >> 21) & 1) != 0)
     }
 }
-#[doc = "Tx FIFO / Queue Status\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`txfqs::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "Tx FIFO / Queue Status\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`txfqs::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct TXFQS_SPEC;
 impl crate::RegisterSpec for TXFQS_SPEC {
     type Ux = u32;

@@ -23,7 +23,7 @@ impl R {
         REL_R::new(((self.bits >> 28) & 0x0f) as u8)
     }
 }
-#[doc = "Core Release\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`crel::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "Core Release\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`crel::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct CREL_SPEC;
 impl crate::RegisterSpec for CREL_SPEC {
     type Ux = u32;

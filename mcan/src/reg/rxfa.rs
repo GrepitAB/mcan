@@ -1,24 +1,24 @@
-#[doc = "Register `RXF0A` reader"]
-pub type R = crate::R<RXF0A_SPEC>;
-#[doc = "Register `RXF0A` writer"]
-pub type W = crate::W<RXF0A_SPEC>;
-#[doc = "Field `F0AI` reader - Rx FIFO 0 Acknowledge Index"]
-pub type F0AI_R = crate::FieldReader;
-#[doc = "Field `F0AI` writer - Rx FIFO 0 Acknowledge Index"]
-pub type F0AI_W<'a, REG, const O: u8> = crate::FieldWriter<'a, REG, 6, O>;
+#[doc = "Register `RXFA` reader"]
+pub type R = crate::R<RXFA_SPEC>;
+#[doc = "Register `RXFA` writer"]
+pub type W = crate::W<RXFA_SPEC>;
+#[doc = "Field `FAI` reader - Rx FIFO Acknowledge Index"]
+pub type FAI_R = crate::FieldReader;
+#[doc = "Field `FAI` writer - Rx FIFO Acknowledge Index"]
+pub type FAI_W<'a, REG, const O: u8> = crate::FieldWriter<'a, REG, 6, O>;
 impl R {
-    #[doc = "Bits 0:5 - Rx FIFO 0 Acknowledge Index"]
+    #[doc = "Bits 0:5 - Rx FIFO Acknowledge Index"]
     #[inline(always)]
-    pub fn f0ai(&self) -> F0AI_R {
-        F0AI_R::new((self.bits & 0x3f) as u8)
+    pub fn fai(&self) -> FAI_R {
+        FAI_R::new((self.bits & 0x3f) as u8)
     }
 }
 impl W {
-    #[doc = "Bits 0:5 - Rx FIFO 0 Acknowledge Index"]
+    #[doc = "Bits 0:5 - Rx FIFO Acknowledge Index"]
     #[inline(always)]
     #[must_use]
-    pub fn f0ai(&mut self) -> F0AI_W<RXF0A_SPEC, 0> {
-        F0AI_W::new(self)
+    pub fn fai(&mut self) -> FAI_W<RXFA_SPEC, 0> {
+        FAI_W::new(self)
     }
     #[doc = r" Writes raw bits to the register."]
     #[doc = r""]
@@ -31,19 +31,19 @@ impl W {
         self
     }
 }
-#[doc = "Rx FIFO 0 Acknowledge\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`rxf0a::R`](R).  You can [`reset`](crate::generic::Reg::reset), [`write`](crate::generic::Reg::write), [`write_with_zero`](crate::generic::Reg::write_with_zero) this register using [`rxf0a::W`](W). You can also [`modify`](crate::generic::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
-pub struct RXF0A_SPEC;
-impl crate::RegisterSpec for RXF0A_SPEC {
+#[doc = "Rx FIFO Acknowledge\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`rxfa::R`](R).  You can [`reset`](crate::reg::generic::Reg::reset), [`write`](crate::reg::generic::Reg::write), [`write_with_zero`](crate::reg::generic::Reg::write_with_zero) this register using [`rxfa::W`](W). You can also [`modify`](crate::reg::generic::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+pub struct RXFA_SPEC;
+impl crate::RegisterSpec for RXFA_SPEC {
     type Ux = u32;
 }
-#[doc = "`read()` method returns [`rxf0a::R`](R) reader structure"]
-impl crate::Readable for RXF0A_SPEC {}
-#[doc = "`write(|w| ..)` method takes [`rxf0a::W`](W) writer structure"]
-impl crate::Writable for RXF0A_SPEC {
+#[doc = "`read()` method returns [`rxfa::R`](R) reader structure"]
+impl crate::Readable for RXFA_SPEC {}
+#[doc = "`write(|w| ..)` method takes [`rxfa::W`](W) writer structure"]
+impl crate::Writable for RXFA_SPEC {
     const ZERO_TO_MODIFY_FIELDS_BITMAP: Self::Ux = 0;
     const ONE_TO_MODIFY_FIELDS_BITMAP: Self::Ux = 0;
 }
-#[doc = "`reset()` method sets RXF0A to value 0"]
-impl crate::Resettable for RXF0A_SPEC {
+#[doc = "`reset()` method sets RXFA to value 0"]
+impl crate::Resettable for RXFA_SPEC {
     const RESET_VALUE: Self::Ux = 0;
 }

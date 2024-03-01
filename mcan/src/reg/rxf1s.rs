@@ -99,7 +99,7 @@ impl R {
         DMS_R::new(((self.bits >> 30) & 3) as u8)
     }
 }
-#[doc = "Rx FIFO 1 Status\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`rxf1s::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "Rx FIFO 1 Status\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`rxf1s::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct RXF1S_SPEC;
 impl crate::RegisterSpec for RXF1S_SPEC {
     type Ux = u32;

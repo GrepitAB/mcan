@@ -85,7 +85,7 @@ impl R {
         FLST_R::new(((self.bits >> 15) & 1) != 0)
     }
 }
-#[doc = "High Priority Message Status\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`hpms::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "High Priority Message Status\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`hpms::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct HPMS_SPEC;
 impl crate::RegisterSpec for HPMS_SPEC {
     type Ux = u32;

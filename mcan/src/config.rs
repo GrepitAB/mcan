@@ -1,6 +1,6 @@
 //! CAN bus configuration
 
-pub use crate::reg::{self, tscc::TSS_A as TimeStampSelect};
+pub use crate::reg::{self, tscc::TSSSELECT_A as TimeStampSelect};
 use core::ops::RangeInclusive;
 use fugit::HertzU32;
 

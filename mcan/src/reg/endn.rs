@@ -9,7 +9,7 @@ impl R {
         ETV_R::new(self.bits)
     }
 }
-#[doc = "Endian\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`endn::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+#[doc = "Endian\n\nYou can [`read`](crate::reg::generic::Reg::read) this register and get [`endn::R`](R).  See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
 pub struct ENDN_SPEC;
 impl crate::RegisterSpec for ENDN_SPEC {
     type Ux = u32;
