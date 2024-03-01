@@ -1,103 +1,49 @@
-#[doc = "Register `RXFA` reader"]
-pub struct R(crate::R<RXFA_SPEC>);
-impl core::ops::Deref for R {
-    type Target = crate::R<RXFA_SPEC>;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl From<crate::R<RXFA_SPEC>> for R {
-    #[inline(always)]
-    fn from(reader: crate::R<RXFA_SPEC>) -> Self {
-        R(reader)
-    }
-}
-#[doc = "Register `RXFA` writer"]
-pub struct W(crate::W<RXFA_SPEC>);
-impl core::ops::Deref for W {
-    type Target = crate::W<RXFA_SPEC>;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl core::ops::DerefMut for W {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-impl From<crate::W<RXFA_SPEC>> for W {
-    #[inline(always)]
-    fn from(writer: crate::W<RXFA_SPEC>) -> Self {
-        W(writer)
-    }
-}
-#[doc = "Field `FAI` reader - Rx FIFO Acknowledge Index"]
-pub struct FAI_R(crate::FieldReader<u8, u8>);
-impl FAI_R {
-    #[inline(always)]
-    pub(crate) fn new(bits: u8) -> Self {
-        FAI_R(crate::FieldReader::new(bits))
-    }
-}
-impl core::ops::Deref for FAI_R {
-    type Target = crate::FieldReader<u8, u8>;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-#[doc = "Field `FAI` writer - Rx FIFO Acknowledge Index"]
-pub struct FAI_W<'a> {
-    w: &'a mut W,
-}
-impl<'a> FAI_W<'a> {
-    #[doc = r"Writes raw bits to the field"]
-    #[inline(always)]
-    pub unsafe fn bits(self, value: u8) -> &'a mut W {
-        self.w.bits = (self.w.bits & !0x3f) | (value as u32 & 0x3f);
-        self.w
-    }
-}
+#[doc = "Register `RXF0A` reader"]
+pub type R = crate::R<RXF0A_SPEC>;
+#[doc = "Register `RXF0A` writer"]
+pub type W = crate::W<RXF0A_SPEC>;
+#[doc = "Field `F0AI` reader - Rx FIFO 0 Acknowledge Index"]
+pub type F0AI_R = crate::FieldReader;
+#[doc = "Field `F0AI` writer - Rx FIFO 0 Acknowledge Index"]
+pub type F0AI_W<'a, REG, const O: u8> = crate::FieldWriter<'a, REG, 6, O>;
 impl R {
-    #[doc = "Bits 0:5 - Rx FIFO Acknowledge Index"]
+    #[doc = "Bits 0:5 - Rx FIFO 0 Acknowledge Index"]
     #[inline(always)]
-    pub fn fai(&self) -> FAI_R {
-        FAI_R::new((self.bits & 0x3f) as u8)
+    pub fn f0ai(&self) -> F0AI_R {
+        F0AI_R::new((self.bits & 0x3f) as u8)
     }
 }
 impl W {
-    #[doc = "Bits 0:5 - Rx FIFO Acknowledge Index"]
+    #[doc = "Bits 0:5 - Rx FIFO 0 Acknowledge Index"]
     #[inline(always)]
-    pub fn fai(&mut self) -> FAI_W {
-        FAI_W { w: self }
+    #[must_use]
+    pub fn f0ai(&mut self) -> F0AI_W<RXF0A_SPEC, 0> {
+        F0AI_W::new(self)
     }
-    #[doc = "Writes raw bits to the register."]
+    #[doc = r" Writes raw bits to the register."]
+    #[doc = r""]
+    #[doc = r" # Safety"]
+    #[doc = r""]
+    #[doc = r" Passing incorrect value can cause undefined behaviour. See reference manual"]
     #[inline(always)]
     pub unsafe fn bits(&mut self, bits: u32) -> &mut Self {
-        self.0.bits(bits);
+        self.bits = bits;
         self
     }
 }
-#[doc = "Rx FIFO Acknowledge\n\nThis register you can [`read`](crate::reg::generic::Reg::read), [`write_with_zero`](crate::reg::generic::Reg::write_with_zero), [`reset`](crate::reg::generic::Reg::reset), [`write`](crate::reg::generic::Reg::write), [`modify`](crate::reg::generic::Reg::modify). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [rxfa](index.html) module"]
-pub struct RXFA_SPEC;
-impl crate::RegisterSpec for RXFA_SPEC {
+#[doc = "Rx FIFO 0 Acknowledge\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`rxf0a::R`](R).  You can [`reset`](crate::generic::Reg::reset), [`write`](crate::generic::Reg::write), [`write_with_zero`](crate::generic::Reg::write_with_zero) this register using [`rxf0a::W`](W). You can also [`modify`](crate::generic::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+pub struct RXF0A_SPEC;
+impl crate::RegisterSpec for RXF0A_SPEC {
     type Ux = u32;
 }
-#[doc = "`read()` method returns [rxfa::R](R) reader structure"]
-impl crate::Readable for RXFA_SPEC {
-    type Reader = R;
+#[doc = "`read()` method returns [`rxf0a::R`](R) reader structure"]
+impl crate::Readable for RXF0A_SPEC {}
+#[doc = "`write(|w| ..)` method takes [`rxf0a::W`](W) writer structure"]
+impl crate::Writable for RXF0A_SPEC {
+    const ZERO_TO_MODIFY_FIELDS_BITMAP: Self::Ux = 0;
+    const ONE_TO_MODIFY_FIELDS_BITMAP: Self::Ux = 0;
 }
-#[doc = "`write(|w| ..)` method takes [rxfa::W](W) writer structure"]
-impl crate::Writable for RXFA_SPEC {
-    type Writer = W;
-}
-#[doc = "`reset()` method sets RXFA to value 0"]
-impl crate::Resettable for RXFA_SPEC {
-    #[inline(always)]
-    fn reset_value() -> Self::Ux {
-        0
-    }
+#[doc = "`reset()` method sets RXF0A to value 0"]
+impl crate::Resettable for RXF0A_SPEC {
+    const RESET_VALUE: Self::Ux = 0;
 }

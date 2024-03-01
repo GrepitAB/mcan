@@ -1,224 +1,94 @@
-#[doc = "Register `RXFC` reader"]
-pub struct R(crate::R<RXFC_SPEC>);
-impl core::ops::Deref for R {
-    type Target = crate::R<RXFC_SPEC>;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl From<crate::R<RXFC_SPEC>> for R {
-    #[inline(always)]
-    fn from(reader: crate::R<RXFC_SPEC>) -> Self {
-        R(reader)
-    }
-}
-#[doc = "Register `RXFC` writer"]
-pub struct W(crate::W<RXFC_SPEC>);
-impl core::ops::Deref for W {
-    type Target = crate::W<RXFC_SPEC>;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl core::ops::DerefMut for W {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-impl From<crate::W<RXFC_SPEC>> for W {
-    #[inline(always)]
-    fn from(writer: crate::W<RXFC_SPEC>) -> Self {
-        W(writer)
-    }
-}
-#[doc = "Field `FSA` reader - Rx FIFO Start Address"]
-pub struct FSA_R(crate::FieldReader<u16, u16>);
-impl FSA_R {
-    #[inline(always)]
-    pub(crate) fn new(bits: u16) -> Self {
-        FSA_R(crate::FieldReader::new(bits))
-    }
-}
-impl core::ops::Deref for FSA_R {
-    type Target = crate::FieldReader<u16, u16>;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-#[doc = "Field `FSA` writer - Rx FIFO Start Address"]
-pub struct FSA_W<'a> {
-    w: &'a mut W,
-}
-impl<'a> FSA_W<'a> {
-    #[doc = r"Writes raw bits to the field"]
-    #[inline(always)]
-    pub unsafe fn bits(self, value: u16) -> &'a mut W {
-        self.w.bits = (self.w.bits & !0xffff) | (value as u32 & 0xffff);
-        self.w
-    }
-}
-#[doc = "Field `FS` reader - Rx FIFO Size"]
-pub struct FS_R(crate::FieldReader<u8, u8>);
-impl FS_R {
-    #[inline(always)]
-    pub(crate) fn new(bits: u8) -> Self {
-        FS_R(crate::FieldReader::new(bits))
-    }
-}
-impl core::ops::Deref for FS_R {
-    type Target = crate::FieldReader<u8, u8>;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-#[doc = "Field `FS` writer - Rx FIFO Size"]
-pub struct FS_W<'a> {
-    w: &'a mut W,
-}
-impl<'a> FS_W<'a> {
-    #[doc = r"Writes raw bits to the field"]
-    #[inline(always)]
-    pub unsafe fn bits(self, value: u8) -> &'a mut W {
-        self.w.bits = (self.w.bits & !(0x7f << 16)) | ((value as u32 & 0x7f) << 16);
-        self.w
-    }
-}
-#[doc = "Field `FWM` reader - Rx FIFO Watermark"]
-pub struct FWM_R(crate::FieldReader<u8, u8>);
-impl FWM_R {
-    #[inline(always)]
-    pub(crate) fn new(bits: u8) -> Self {
-        FWM_R(crate::FieldReader::new(bits))
-    }
-}
-impl core::ops::Deref for FWM_R {
-    type Target = crate::FieldReader<u8, u8>;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-#[doc = "Field `FWM` writer - Rx FIFO Watermark"]
-pub struct FWM_W<'a> {
-    w: &'a mut W,
-}
-impl<'a> FWM_W<'a> {
-    #[doc = r"Writes raw bits to the field"]
-    #[inline(always)]
-    pub unsafe fn bits(self, value: u8) -> &'a mut W {
-        self.w.bits = (self.w.bits & !(0x7f << 24)) | ((value as u32 & 0x7f) << 24);
-        self.w
-    }
-}
-#[doc = "Field `FOM` reader - FIFO Operation Mode"]
-pub struct FOM_R(crate::FieldReader<bool, bool>);
-impl FOM_R {
-    #[inline(always)]
-    pub(crate) fn new(bits: bool) -> Self {
-        FOM_R(crate::FieldReader::new(bits))
-    }
-}
-impl core::ops::Deref for FOM_R {
-    type Target = crate::FieldReader<bool, bool>;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-#[doc = "Field `FOM` writer - FIFO Operation Mode"]
-pub struct FOM_W<'a> {
-    w: &'a mut W,
-}
-impl<'a> FOM_W<'a> {
-    #[doc = r"Sets the field bit"]
-    #[inline(always)]
-    pub fn set_bit(self) -> &'a mut W {
-        self.bit(true)
-    }
-    #[doc = r"Clears the field bit"]
-    #[inline(always)]
-    pub fn clear_bit(self) -> &'a mut W {
-        self.bit(false)
-    }
-    #[doc = r"Writes raw bits to the field"]
-    #[inline(always)]
-    pub fn bit(self, value: bool) -> &'a mut W {
-        self.w.bits = (self.w.bits & !(0x01 << 31)) | ((value as u32 & 0x01) << 31);
-        self.w
-    }
-}
+#[doc = "Register `RXF0C` reader"]
+pub type R = crate::R<RXF0C_SPEC>;
+#[doc = "Register `RXF0C` writer"]
+pub type W = crate::W<RXF0C_SPEC>;
+#[doc = "Field `F0SA` reader - Rx FIFO 0 Start Address"]
+pub type F0SA_R = crate::FieldReader<u16>;
+#[doc = "Field `F0SA` writer - Rx FIFO 0 Start Address"]
+pub type F0SA_W<'a, REG, const O: u8> = crate::FieldWriter<'a, REG, 16, O, u16>;
+#[doc = "Field `F0S` reader - Rx FIFO 0 Size"]
+pub type F0S_R = crate::FieldReader;
+#[doc = "Field `F0S` writer - Rx FIFO 0 Size"]
+pub type F0S_W<'a, REG, const O: u8> = crate::FieldWriter<'a, REG, 7, O>;
+#[doc = "Field `F0WM` reader - Rx FIFO 0 Watermark"]
+pub type F0WM_R = crate::FieldReader;
+#[doc = "Field `F0WM` writer - Rx FIFO 0 Watermark"]
+pub type F0WM_W<'a, REG, const O: u8> = crate::FieldWriter<'a, REG, 7, O>;
+#[doc = "Field `F0OM` reader - FIFO 0 Operation Mode"]
+pub type F0OM_R = crate::BitReader;
+#[doc = "Field `F0OM` writer - FIFO 0 Operation Mode"]
+pub type F0OM_W<'a, REG, const O: u8> = crate::BitWriter<'a, REG, O>;
 impl R {
-    #[doc = "Bits 0:15 - Rx FIFO Start Address"]
+    #[doc = "Bits 0:15 - Rx FIFO 0 Start Address"]
     #[inline(always)]
-    pub fn fsa(&self) -> FSA_R {
-        FSA_R::new((self.bits & 0xffff) as u16)
+    pub fn f0sa(&self) -> F0SA_R {
+        F0SA_R::new((self.bits & 0xffff) as u16)
     }
-    #[doc = "Bits 16:22 - Rx FIFO Size"]
+    #[doc = "Bits 16:22 - Rx FIFO 0 Size"]
     #[inline(always)]
-    pub fn fs(&self) -> FS_R {
-        FS_R::new(((self.bits >> 16) & 0x7f) as u8)
+    pub fn f0s(&self) -> F0S_R {
+        F0S_R::new(((self.bits >> 16) & 0x7f) as u8)
     }
-    #[doc = "Bits 24:30 - Rx FIFO Watermark"]
+    #[doc = "Bits 24:30 - Rx FIFO 0 Watermark"]
     #[inline(always)]
-    pub fn fwm(&self) -> FWM_R {
-        FWM_R::new(((self.bits >> 24) & 0x7f) as u8)
+    pub fn f0wm(&self) -> F0WM_R {
+        F0WM_R::new(((self.bits >> 24) & 0x7f) as u8)
     }
-    #[doc = "Bit 31 - FIFO Operation Mode"]
+    #[doc = "Bit 31 - FIFO 0 Operation Mode"]
     #[inline(always)]
-    pub fn fom(&self) -> FOM_R {
-        FOM_R::new(((self.bits >> 31) & 0x01) != 0)
+    pub fn f0om(&self) -> F0OM_R {
+        F0OM_R::new(((self.bits >> 31) & 1) != 0)
     }
 }
 impl W {
-    #[doc = "Bits 0:15 - Rx FIFO Start Address"]
+    #[doc = "Bits 0:15 - Rx FIFO 0 Start Address"]
     #[inline(always)]
-    pub fn fsa(&mut self) -> FSA_W {
-        FSA_W { w: self }
+    #[must_use]
+    pub fn f0sa(&mut self) -> F0SA_W<RXF0C_SPEC, 0> {
+        F0SA_W::new(self)
     }
-    #[doc = "Bits 16:22 - Rx FIFO Size"]
+    #[doc = "Bits 16:22 - Rx FIFO 0 Size"]
     #[inline(always)]
-    pub fn fs(&mut self) -> FS_W {
-        FS_W { w: self }
+    #[must_use]
+    pub fn f0s(&mut self) -> F0S_W<RXF0C_SPEC, 16> {
+        F0S_W::new(self)
     }
-    #[doc = "Bits 24:30 - Rx FIFO Watermark"]
+    #[doc = "Bits 24:30 - Rx FIFO 0 Watermark"]
     #[inline(always)]
-    pub fn fwm(&mut self) -> FWM_W {
-        FWM_W { w: self }
+    #[must_use]
+    pub fn f0wm(&mut self) -> F0WM_W<RXF0C_SPEC, 24> {
+        F0WM_W::new(self)
     }
-    #[doc = "Bit 31 - FIFO Operation Mode"]
+    #[doc = "Bit 31 - FIFO 0 Operation Mode"]
     #[inline(always)]
-    pub fn fom(&mut self) -> FOM_W {
-        FOM_W { w: self }
+    #[must_use]
+    pub fn f0om(&mut self) -> F0OM_W<RXF0C_SPEC, 31> {
+        F0OM_W::new(self)
     }
-    #[doc = "Writes raw bits to the register."]
+    #[doc = r" Writes raw bits to the register."]
+    #[doc = r""]
+    #[doc = r" # Safety"]
+    #[doc = r""]
+    #[doc = r" Passing incorrect value can cause undefined behaviour. See reference manual"]
     #[inline(always)]
     pub unsafe fn bits(&mut self, bits: u32) -> &mut Self {
-        self.0.bits(bits);
+        self.bits = bits;
         self
     }
 }
-#[doc = "Rx FIFO Configuration\n\nThis register you can [`read`](crate::reg::generic::Reg::read), [`write_with_zero`](crate::reg::generic::Reg::write_with_zero), [`reset`](crate::reg::generic::Reg::reset), [`write`](crate::reg::generic::Reg::write), [`modify`](crate::reg::generic::Reg::modify). See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [rxfc](index.html) module"]
-pub struct RXFC_SPEC;
-impl crate::RegisterSpec for RXFC_SPEC {
+#[doc = "Rx FIFO 0 Configuration\n\nYou can [`read`](crate::generic::Reg::read) this register and get [`rxf0c::R`](R).  You can [`reset`](crate::generic::Reg::reset), [`write`](crate::generic::Reg::write), [`write_with_zero`](crate::generic::Reg::write_with_zero) this register using [`rxf0c::W`](W). You can also [`modify`](crate::generic::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+pub struct RXF0C_SPEC;
+impl crate::RegisterSpec for RXF0C_SPEC {
     type Ux = u32;
 }
-#[doc = "`read()` method returns [rxfc::R](R) reader structure"]
-impl crate::Readable for RXFC_SPEC {
-    type Reader = R;
+#[doc = "`read()` method returns [`rxf0c::R`](R) reader structure"]
+impl crate::Readable for RXF0C_SPEC {}
+#[doc = "`write(|w| ..)` method takes [`rxf0c::W`](W) writer structure"]
+impl crate::Writable for RXF0C_SPEC {
+    const ZERO_TO_MODIFY_FIELDS_BITMAP: Self::Ux = 0;
+    const ONE_TO_MODIFY_FIELDS_BITMAP: Self::Ux = 0;
 }
-#[doc = "`write(|w| ..)` method takes [rxfc::W](W) writer structure"]
-impl crate::Writable for RXFC_SPEC {
-    type Writer = W;
-}
-#[doc = "`reset()` method sets RXFC to value 0"]
-impl crate::Resettable for RXFC_SPEC {
-    #[inline(always)]
-    fn reset_value() -> Self::Ux {
-        0
-    }
+#[doc = "`reset()` method sets RXF0C to value 0"]
+impl crate::Resettable for RXF0C_SPEC {
+    const RESET_VALUE: Self::Ux = 0;
 }
