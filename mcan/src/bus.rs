@@ -575,6 +575,16 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         Ok(can)
     }
 
+    /// Locks the configuration and enters initialization mode.
+    pub fn finalize_initialized(mut self) -> Result<Can<'a, Id, D, C>, ConfigurationError> {
+        self.apply_configuration()?;
+
+        let can = self.0;
+        can.aux.initialization_mode();
+
+        Ok(can)
+    }
+
     /// Locks the configuration and enters normal operation.
     pub fn finalize(mut self) -> Result<Can<'a, Id, D, C>, ConfigurationError> {
         self.apply_configuration()?;
