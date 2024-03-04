@@ -42,14 +42,14 @@ impl Debug for ProtocolStatus {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ProtocolStatus")
             .field("tdcv", &self.tdcv().bits())
-            .field("pxe", &self.pxe().bits())
-            .field("rfdf", &self.rfdf().bits())
-            .field("rbrs", &self.rbrs().bits())
-            .field("resi", &self.resi().bits())
+            .field("pxe", &self.pxe().bit())
+            .field("rfdf", &self.rfdf().bit())
+            .field("rbrs", &self.rbrs().bit())
+            .field("resi", &self.resi().bit())
             .field("dlec", &self.dlec().bits())
-            .field("bo", &self.bo().bits())
-            .field("ew", &self.ew().bits())
-            .field("ep", &self.ep().bits())
+            .field("bo", &self.bo().bit())
+            .field("ew", &self.ew().bit())
+            .field("ep", &self.ep().bit())
             .field("act", &self.act().bits())
             .field("lec", &self.lec().bits())
             .finish()
@@ -326,9 +326,9 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         // filter API
         reg.gfc.write(|w| {
             w.anfs()
-                .variant(crate::reg::gfc::ANFS_A::REJECT)
+                .variant(crate::reg::gfc::ANFSSELECT_A::REJECT)
                 .anfe()
-                .variant(crate::reg::gfc::ANFE_A::REJECT)
+                .variant(crate::reg::gfc::ANFESELECT_A::REJECT)
         });
 
         // Configure test/loopback mode
