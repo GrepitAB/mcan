@@ -3,6 +3,7 @@
 Tagging in git follows a pattern: `mcan/<version>`.
 
 ## [Unreleased]
+- Add method to check if bus is dominant (#51)
 
 ## [0.5.0] - 2024-03-04
 
