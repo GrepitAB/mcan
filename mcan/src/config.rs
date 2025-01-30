@@ -43,6 +43,7 @@ pub struct TxConfig {
 /// - the time quantum `t_q`, which is a fraction of the peripheral clock
 /// - the number of time quanta in a bit time, determined by `phase_seg_1` and
 ///   `phase_seg_2`
+///
 /// The configurable ranges of the parameters depend on which timing is changed.
 ///
 /// This struct expects *real* values, extra subtractions and additions expected

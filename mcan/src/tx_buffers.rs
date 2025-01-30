@@ -260,7 +260,7 @@ impl<'a, P: mcan_core::CanId, C: Capacities> Tx<'a, P, C> {
     }
 }
 
-impl<'a, P: mcan_core::CanId, C: Capacities> DynTx for Tx<'a, P, C> {
+impl<P: mcan_core::CanId, C: Capacities> DynTx for Tx<'_, P, C> {
     type Id = P;
     type Message = C::TxMessage;
 

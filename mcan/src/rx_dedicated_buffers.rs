@@ -111,9 +111,7 @@ impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> RxDedicatedBuffer<'a, P, M> {
     }
 }
 
-impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> DynRxDedicatedBuffer
-    for RxDedicatedBuffer<'a, P, M>
-{
+impl<P: mcan_core::CanId, M: rx::AnyMessage> DynRxDedicatedBuffer for RxDedicatedBuffer<'_, P, M> {
     type Id = P;
     type Message = M;
 
@@ -138,7 +136,7 @@ impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> DynRxDedicatedBuffer
     }
 }
 
-impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> Iterator for RxDedicatedBuffer<'a, P, M> {
+impl<P: mcan_core::CanId, M: rx::AnyMessage> Iterator for RxDedicatedBuffer<'_, P, M> {
     type Item = M;
 
     fn next(&mut self) -> Option<Self::Item> {

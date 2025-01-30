@@ -54,12 +54,12 @@ pub trait GetRxFifoRegs {
     unsafe fn registers(&self) -> &reg::RxFifoRegs;
 }
 
-impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'a, Fifo0, P, M> {
+impl<P: mcan_core::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'_, Fifo0, P, M> {
     unsafe fn registers(&self) -> &reg::RxFifoRegs {
         &(*P::register_block()).rxf0
     }
 }
-impl<'a, P: mcan_core::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'a, Fifo1, P, M> {
+impl<P: mcan_core::CanId, M: rx::AnyMessage> GetRxFifoRegs for RxFifo<'_, Fifo1, P, M> {
     unsafe fn registers(&self) -> &reg::RxFifoRegs {
         &(*P::register_block()).rxf1
     }
@@ -90,7 +90,7 @@ where
     }
 }
 
-impl<'a, F, P: mcan_core::CanId, M: rx::AnyMessage> DynRxFifo for RxFifo<'a, F, P, M>
+impl<F, P: mcan_core::CanId, M: rx::AnyMessage> DynRxFifo for RxFifo<'_, F, P, M>
 where
     Self: GetRxFifoRegs,
 {
@@ -128,7 +128,7 @@ where
     }
 }
 
-impl<'a, F, P: mcan_core::CanId, M: rx::AnyMessage> Iterator for RxFifo<'a, F, P, M>
+impl<F, P: mcan_core::CanId, M: rx::AnyMessage> Iterator for RxFifo<'_, F, P, M>
 where
     Self: GetRxFifoRegs,
 {

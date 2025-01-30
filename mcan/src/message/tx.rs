@@ -107,7 +107,7 @@ pub struct MessageBuilder<'a> {
     pub store_tx_event: Option<u8>,
 }
 
-impl<'a> MessageBuilder<'a> {
+impl MessageBuilder<'_> {
     /// Create the message in the format required by the peripheral.
     pub fn build<const N: usize>(self) -> Result<Message<N>, TooMuchData> {
         let mut data = [0; N];

@@ -61,7 +61,7 @@ impl<'a, P: mcan_core::CanId> TxEventFifo<'a, P> {
     }
 }
 
-impl<'a, P: mcan_core::CanId> DynTxEventFifo for TxEventFifo<'a, P> {
+impl<P: mcan_core::CanId> DynTxEventFifo for TxEventFifo<'_, P> {
     type Id = P;
 
     fn len(&self) -> usize {
