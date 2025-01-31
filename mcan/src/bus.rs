@@ -201,13 +201,13 @@ pub trait DynAux {
     fn timestamp(&self) -> u16;
 }
 
-impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Aux<'a, Id, D> {
+impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Aux<'_, Id, D> {
     fn configuration_mode(&self) {
         self.reg.configuration_mode()
     }
 }
 
-impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'a, Id, D> {
+impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'_, Id, D> {
     type Id = Id;
     type Deps = D;
 

@@ -91,3 +91,9 @@ impl<C: Capacities> SharedMemory<C> {
         eligible_message_ram_start <= start && end_exclusive - eligible_message_ram_start <= 1 << 16
     }
 }
+
+impl<C: Capacities> Default for SharedMemory<C> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

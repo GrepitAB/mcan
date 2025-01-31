@@ -458,7 +458,7 @@ impl<Id: mcan_core::CanId, State> OwnedInterruptSet<Id, State> {
     ///
     /// # Safety
     /// - Each interrupt of a CAN peripheral can only be contained in one
-    /// `OwnedInterruptSet`, otherwise registers will be mutably aliased.
+    ///   `OwnedInterruptSet`, otherwise registers will be mutably aliased.
     /// - The reserved bits must not be included.
     /// - `State` type parameter must match the state in runtime.
     unsafe fn new(interrupts: InterruptSet) -> Self {
