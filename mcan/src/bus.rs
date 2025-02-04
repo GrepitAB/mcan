@@ -199,6 +199,9 @@ pub trait DynAux {
     ///
     /// If timestamping is disabled, its value is zero.
     fn timestamp(&self) -> u16;
+
+    /// Returns `true` if the CAN bus is dominant.
+    fn is_dominant(&self) -> bool;
 }
 
 impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Aux<'_, Id, D> {
@@ -241,6 +244,10 @@ impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'_, Id
 
     fn timestamp(&self) -> u16 {
         self.reg.tscv.read().tsc().bits()
+    }
+
+    fn is_dominant(&self) -> bool {
+        self.reg.test.read().rx().bit_is_clear()
     }
 }
 
