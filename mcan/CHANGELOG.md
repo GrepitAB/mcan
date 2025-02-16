@@ -3,6 +3,7 @@
 Tagging in git follows a pattern: `mcan/<version>`.
 
 ## [Unreleased]
+- Improve performance of RxDedicatedBuffer::receive_any (#50)
 
 ## [0.6.0] - 2025-02-04
 
