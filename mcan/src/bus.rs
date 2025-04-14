@@ -202,6 +202,9 @@ pub trait DynAux {
 
     /// Returns `true` if the CAN bus is dominant.
     fn is_dominant(&self) -> bool;
+
+    /// Returns `true` if the TX FIFO/Queue is full.
+    fn tx_buffer_full(&self) -> bool;
 }
 
 impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Aux<'_, Id, D> {
@@ -248,6 +251,9 @@ impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'_, Id
 
     fn is_dominant(&self) -> bool {
         self.reg.test.read().rx().bit_is_clear()
+    }
+    fn tx_buffer_full(&self) -> bool {
+        self.reg.txfqs.read().tfqf().bit_is_set()
     }
 }
 
