@@ -230,7 +230,12 @@ impl From<Filter> for FilterStandardId {
                 id,
                 msg_type,
                 offset,
-            } => (id.as_raw() as u32) << 16 | (msg_type as u32) << 9 | offset as u32 | (0x7 << 27),
+            } => {
+                ((id.as_raw() as u32) << 16)
+                    | ((msg_type as u32) << 9)
+                    | offset as u32
+                    | (0x7 << 27)
+            }
         };
 
         FilterStandardId(v)
@@ -244,12 +249,12 @@ impl From<ExtFilter> for FilterExtendedId {
             ExtFilter::MaskedRange { action, high, low } => {
                 let action: u32 = action.into();
 
-                ((action << 29 | low.as_raw()), high.as_raw())
+                ((action << 29) | low.as_raw(), high.as_raw())
             }
             ExtFilter::Dual { action, id1, id2 } => {
                 let action: u32 = action.into();
 
-                ((action << 29 | id1.as_raw()), (1 << 30 | id2.as_raw()))
+                ((action << 29) | id1.as_raw(), (1 << 30) | id2.as_raw())
             }
             ExtFilter::Classic {
                 action,
@@ -258,20 +263,20 @@ impl From<ExtFilter> for FilterExtendedId {
             } => {
                 let action: u32 = action.into();
 
-                ((action << 29 | filter.as_raw()), (2 << 30 | mask.as_raw()))
+                ((action << 29) | filter.as_raw(), (2 << 30) | mask.as_raw())
             }
             ExtFilter::Range { action, high, low } => {
                 let action: u32 = action.into();
 
-                ((action << 29 | low.as_raw()), (3 << 30 | high.as_raw()))
+                ((action << 29) | low.as_raw(), (3 << 30) | high.as_raw())
             }
             ExtFilter::StoreBuffer {
                 id,
                 msg_type,
                 offset,
             } => (
-                (0x7 << 29 | id.as_raw()),
-                (msg_type as u32) << 9 | offset as u32,
+                (0x7 << 29) | id.as_raw(),
+                ((msg_type as u32) << 9) | offset as u32,
             ),
         };
         FilterExtendedId([v1, v2])

@@ -149,7 +149,7 @@ impl MessageBuilder<'_> {
         let efc = self.store_tx_event.is_some();
         let mm = self.store_tx_event.unwrap_or(0);
 
-        let t0 = id_field | (rtr as u32) << 29 | (xtd as u32) << 30 | (esi as u32) << 31;
+        let t0 = id_field | ((rtr as u32) << 29) | ((xtd as u32) << 30) | ((esi as u32) << 31);
         let t1 = (((dlc & 0xf) as u32) << 16)
             | ((brs as u32) << 20)
             | ((fdf as u32) << 21)
