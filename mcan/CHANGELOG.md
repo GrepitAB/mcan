@@ -4,6 +4,9 @@ Tagging in git follows a pattern: `mcan/<version>`.
 
 ## [Unreleased]
 
+### Changed
+- Fix some Clippy lints related to parenthesization (#55)
+
 ## [0.6.0] - 2025-02-04
 
 ### Added
