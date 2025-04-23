@@ -4,6 +4,9 @@ Tagging in git follows a pattern: `mcan/<version>`.
 
 ## [Unreleased]
 
+### Added
+- Add method to query the Tx FIFO/Queue full status (#56)
+
 ## [0.6.0] - 2025-02-04
 
 ### Added
