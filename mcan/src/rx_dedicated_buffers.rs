@@ -122,17 +122,12 @@ impl<P: mcan_core::CanId, M: rx::AnyMessage> DynRxDedicatedBuffer for RxDedicate
     }
 
     fn receive_any(&mut self) -> nb::Result<Self::Message, Infallible> {
-        self.memory
-            .iter()
-            .enumerate()
-            .filter(|&(i, _)| self.has_new_data(i))
-            .map(|(i, m)| (i, m.get()))
-            .min_by_key(|(_, m)| m.id())
-            .map(|(i, m)| {
-                self.mark_buffer_read(i);
-                m
-            })
-            .ok_or(nb::Error::WouldBlock)
+        let ndat =
+            (self.ndat1().read().bits() as u64) | ((self.ndat2().read().bits() as u64) << 32);
+        let idx = ndat.trailing_zeros() as usize;
+        let m = self.memory.get(idx).ok_or(nb::Error::WouldBlock)?;
+        self.mark_buffer_read(idx);
+        Ok(m.get())
     }
 }
 
