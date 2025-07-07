@@ -199,19 +199,21 @@ impl BitTiming {
         let f_out = self.bitrate;
         let bit_time_quanta = self.time_quanta_per_bit();
         let f_q = f_out * bit_time_quanta;
-        if let Some(0) = f_can.to_Hz().checked_rem(f_q.to_Hz()) {
-            let prescaler = f_can / f_q;
-            if !valid.prescaler.contains(&prescaler) {
-                Err(BitTimingError::PrescalerOutOfRange(valid.prescaler.clone()))
-            } else {
-                Ok(prescaler as u16)
+        let max_tolerance = self.bitrate.to_Hz() / 2000; // 0.05% tolerance
+        match f_can.to_Hz().checked_rem(f_q.to_Hz()) {
+            Some(x) if x <= max_tolerance => {
+                let prescaler = f_can / f_q;
+                if !valid.prescaler.contains(&prescaler) {
+                    Err(BitTimingError::PrescalerOutOfRange(valid.prescaler.clone()))
+                } else {
+                    Ok(prescaler as u16)
+                }
             }
-        } else {
-            Err(BitTimingError::NoValidPrescaler {
+            _ => Err(BitTimingError::NoValidPrescaler {
                 can_clock: f_can,
                 bitrate: f_out,
                 bit_time_quanta,
-            })
+            }),
         }
     }
 }
