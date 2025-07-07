@@ -209,13 +209,11 @@ impl BitTiming {
                     Ok(prescaler as u16)
                 }
             }
-            _ => {
-                Err(BitTimingError::NoValidPrescaler {
-                    can_clock: f_can,
-                    bitrate: f_out,
-                    bit_time_quanta,
-                })
-            }
+            _ => Err(BitTimingError::NoValidPrescaler {
+                can_clock: f_can,
+                bitrate: f_out,
+                bit_time_quanta,
+            }),
         }
     }
 }
