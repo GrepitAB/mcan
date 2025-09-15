@@ -205,6 +205,12 @@ pub trait DynAux {
 
     /// Returns `true` if the TX FIFO/Queue is full.
     fn tx_buffer_full(&self) -> bool;
+
+    /// Enable or disable automatic retransmission of messages that are not
+    /// transmitted successfully.
+    ///
+    /// Note: This is enabled by default.
+    fn automatic_retransmission(&self, enabled: bool);
 }
 
 impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> Aux<'_, Id, D> {
@@ -255,6 +261,10 @@ impl<Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>> DynAux for Aux<'_, Id
 
     fn tx_buffer_full(&self) -> bool {
         self.reg.txfqs.read().tfqf().bit_is_set()
+    }
+
+    fn automatic_retransmission(&self, enabled: bool) {
+        self.reg.cccr.modify(|_, w| w.dar().variant(!enabled));
     }
 }
 
