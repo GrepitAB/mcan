@@ -304,6 +304,20 @@ impl<'a, Id: mcan_core::CanId, D: mcan_core::Dependencies<Id>, C: Capacities>
         &mut self.0.aux.config
     }
 
+    /// Verifies that the current bitrate timing parameters can
+    /// be achieved
+    pub fn check_baudrate_settings(&self) -> Result<(), ConfigurationError> {
+        let config = &self.0.aux.config;
+        let dependencies = &self.0.aux.dependencies;
+        if !(1..=16).contains(&config.timestamp.prescaler) {
+            return Err(ConfigurationError::InvalidTimeStampPrescaler);
+        }
+        let _ = config
+            .nominal_timing
+            .prescaler(dependencies.can_clock(), &NOMINAL_BIT_TIMING_RANGES)?;
+        Ok(())
+    }
+
     /// Apply parameters from a bus config struct
     fn apply_configuration(&mut self) -> Result<(), ConfigurationError> {
         let reg = &self.0.aux.reg;
