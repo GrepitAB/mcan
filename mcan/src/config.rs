@@ -208,25 +208,39 @@ impl BitTiming {
         let f_out = self.bitrate;
         let bit_time_quanta = self.time_quanta_per_bit();
         let f_q = f_out * bit_time_quanta;
-        let max_tolerance = if self.allow_fractional {
-            self.bitrate.to_Hz() / 2000 // 0.05% tolerance
-        } else {
-            0
-        };
-        match f_can.to_Hz().checked_rem(f_q.to_Hz()) {
-            Some(x) if x <= max_tolerance => {
-                let prescaler = f_can / f_q;
+
+        if f_can.to_Hz().checked_rem(f_q.to_Hz()).is_some() {
+            let prescaler = f_can/f_q;
+            let actual_bitrate = f_can / (prescaler*bit_time_quanta);
+            let error = if actual_bitrate > f_out {
+                actual_bitrate - f_out
+            } else {
+                f_out - actual_bitrate
+            };
+            let limit = if self.allow_fractional {
+                self.bitrate / 2000 // 0.05%
+            } else {
+                HertzU32::Hz(0)
+            };
+            if error <= limit {
                 if !valid.prescaler.contains(&prescaler) {
                     Err(BitTimingError::PrescalerOutOfRange(valid.prescaler.clone()))
                 } else {
                     Ok(prescaler as u16)
                 }
+            } else {
+                Err(BitTimingError::NoValidPrescaler {
+                    can_clock: f_can,
+                    bitrate: f_out,
+                    bit_time_quanta,
+                })
             }
-            _ => Err(BitTimingError::NoValidPrescaler {
+        } else  {
+            Err(BitTimingError::NoValidPrescaler {
                 can_clock: f_can,
                 bitrate: f_out,
                 bit_time_quanta,
-            }),
+            }) 
         }
     }
 }
